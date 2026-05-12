@@ -1,28 +1,40 @@
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, LLM
 from dotenv import load_dotenv
+import os
 
-load_dotenv()  # loads your API key from .env
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = "sk-fake-key-not-used"
+
+# Set up Qwen as the LLM
+qwen_llm = LLM(
+    model="qwen-max",
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+)
 
 # ── Placeholder Agents (M2, M3, M4 will replace these) ──
 agent_a = Agent(
     role="Requirements Analyst",
     goal="Analyze software requirements and produce a structured design plan",
     backstory="You are a senior software analyst who breaks down requirements clearly.",
-    verbose=True
+    verbose=True,
+    llm=qwen_llm
 )
 
 agent_b = Agent(
     role="Software Developer",
     goal="Write clean, working Python code based on a given design plan",
     backstory="You are an experienced Python developer who writes production-ready code.",
-    verbose=True
+    verbose=True,
+    llm=qwen_llm
 )
 
 agent_c = Agent(
     role="QA Engineer",
     goal="Test and debug the code, return a fixed and verified version",
     backstory="You are a meticulous QA engineer who catches bugs and fixes them.",
-    verbose=True
+    verbose=True,
+    llm=qwen_llm
 )
 
 # ── Placeholder Tasks ──
