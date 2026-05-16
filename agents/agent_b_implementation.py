@@ -447,7 +447,7 @@ def qwen_generate_implementation(agent_a_data):
     implementation_output = json.loads(json_text)
 
     return implementation_output
-    
+
 
 def run_agent_b(input_path, output_dir):
     """
