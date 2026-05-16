@@ -1,6 +1,10 @@
 import json
 import os
 import ast
+import re
+
+from dotenv import load_dotenv
+import dashscope
 
 
 def read_json_file(file_path):
@@ -346,6 +350,105 @@ def save_implementation_output(output_dir, implementation_output):
     return implementation_json_path, code_file_path
 
 
+def build_qwen_prompt(agent_a_data):
+    """
+    Build prompt for Qwen to generate Agent B implementation output.
+    """
+    agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
+
+    return f"""
+You are Agent B: Code Generator in an LLM-based Software Engineering Agent system.
+
+Your input is Agent A analysis output. It follows this schema:
+- requirement_summary: string
+- components: array of strings
+- design_plan: string
+- dependencies: array of strings
+
+Your task is to generate Python implementation code.
+
+You must return ONLY valid JSON.
+Do not use markdown code blocks.
+Do not add explanations outside JSON.
+
+The JSON output must follow this schema:
+{{
+    "code": "actual Python code as a string",
+    "filename": "suggested_file_name.py",
+    "language": "python",
+    "dependencies": [],
+    "notes": "short notes for Agent C"
+}}
+
+Rules:
+1. Generate clean and runnable Python code.
+2. Use simple student-friendly code.
+3. Do not use external libraries unless required.
+4. Include a simple command-line demo under if __name__ == "__main__".
+5. Make sure the code can pass ast.parse syntax checking.
+6. The filename should match the project topic.
+
+Agent A input:
+{agent_a_json}
+"""
+
+
+def extract_json_from_text(text):
+    """
+    Extract JSON object from Qwen response text.
+    """
+    text = text.strip()
+
+    if text.startswith("```"):
+        text = re.sub(r"^```json", "", text)
+        text = re.sub(r"^```", "", text)
+        text = re.sub(r"```$", "", text)
+        text = text.strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1:
+        raise ValueError("No JSON object found in Qwen response")
+
+    return text[start:end + 1]
+
+
+def qwen_generate_implementation(agent_a_data):
+    """
+    Generate Agent B implementation output using Qwen / DashScope API.
+    """
+    load_dotenv()
+
+    api_key = os.getenv("DASHSCOPE_API_KEY")
+
+    if not api_key:
+        raise ValueError("DASHSCOPE_API_KEY is missing. Check your .env file.")
+
+    dashscope.api_key = api_key
+    dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+    prompt = build_qwen_prompt(agent_a_data)
+
+    response = dashscope.Generation.call(
+        model="qwen3.6-max-preview",
+        prompt=prompt
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Qwen API call failed: {response.code} - {response.message}"
+        )
+
+    message = response["output"]["choices"][0]["message"]
+    content = message["content"]
+
+    json_text = extract_json_from_text(content)
+    implementation_output = json.loads(json_text)
+
+    return implementation_output
+    
+
 def run_agent_b(input_path, output_dir):
     """
     Main Agent B workflow.
@@ -367,7 +470,13 @@ def run_agent_b(input_path, output_dir):
             "stage": "validate_analysis_output"
         }
 
-    implementation_output = mock_llm_generate_implementation(agent_a_data)
+    try:
+        implementation_output = qwen_generate_implementation(agent_a_data)
+        generation_mode = "qwen_api"
+    except Exception as error:
+        print(f"Qwen generation failed, fallback to mock mode: {error}")
+        implementation_output = mock_llm_generate_implementation(agent_a_data)
+        generation_mode = "mock_llm_fallback"
 
     implementation_valid, implementation_message = validate_implementation_output(
         implementation_output
@@ -400,14 +509,14 @@ def run_agent_b(input_path, output_dir):
         "language": implementation_output["language"],
         "dependencies": implementation_output["dependencies"],
         "syntax_check": syntax_message,
-        "mode": "mock_llm_no_api_key"
+        "mode": generation_mode
     }
 
     return result
 
 
 if __name__ == "__main__":
-    input_path = "inputs/agent_a_output.json"
+    input_path = "tests/agent_b_sample_input.json"
     output_dir = "outputs"
 
     result = run_agent_b(input_path, output_dir)
