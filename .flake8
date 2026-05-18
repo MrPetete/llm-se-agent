@@ -6,5 +6,6 @@ exclude =
     __pycache__,
     venv,
     .venv,
+    outputs,
     tests/scripts.py,
     tests/test_wrapper.py
