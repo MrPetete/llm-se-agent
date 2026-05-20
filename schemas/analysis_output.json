@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalysisOutput",
+  "description": "Output produced by Agent A after analyzing a software requirement",
+  "type": "object",
+  "properties": {
+    "requirement_summary": {
+      "type": "string",
+      "description": "A short summary of what the user wants"
+    },
+    "components": {
+      "type": "array",
+      "description": "List of software components needed",
+      "items": {
+        "type": "string"
+      }
+    },
+    "design_plan": {
+      "type": "string",
+      "description": "Step by step plan for implementing the requirement"
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of libraries or tools needed",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["requirement_summary", "components", "design_plan", "dependencies"]
+}
