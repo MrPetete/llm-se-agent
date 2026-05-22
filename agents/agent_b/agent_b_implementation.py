@@ -470,6 +470,9 @@ def run_agent_b(input_path, output_dir):
             "stage": "validate_analysis_output"
         }
 
+    retry_used = False
+    retry_reason = "none"
+
     try:
         implementation_output = qwen_generate_implementation(agent_a_data)
         generation_mode = "qwen_api"
@@ -477,6 +480,8 @@ def run_agent_b(input_path, output_dir):
         print(f"Qwen generation failed, fallback to mock mode: {error}")
         implementation_output = mock_llm_generate_implementation(agent_a_data)
         generation_mode = "mock_llm_fallback"
+        retry_used = True
+        retry_reason = "qwen_api_failed_fallback_to_mock"
 
     implementation_valid, implementation_message = validate_implementation_output(
         implementation_output
@@ -509,7 +514,9 @@ def run_agent_b(input_path, output_dir):
         "language": implementation_output["language"],
         "dependencies": implementation_output["dependencies"],
         "syntax_check": syntax_message,
-        "mode": generation_mode
+        "mode": generation_mode,
+        "retry_used": retry_used,
+        "retry_reason": retry_reason
     }
 
     return result

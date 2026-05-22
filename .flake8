@@ -8,5 +8,6 @@ exclude =
     .venv,
     outputs,
     orchestrator/main.py,
+    M2_AgentA,
     tests/scripts.py,
     tests/test_wrapper.py
