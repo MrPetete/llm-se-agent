@@ -449,6 +449,93 @@ def qwen_generate_implementation(agent_a_data):
     return implementation_output
 
 
+def build_repair_prompt(agent_a_data, implementation_output, error_message):
+    """
+    Build prompt for Qwen to repair invalid generated Python code.
+    """
+    agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
+    bad_output_json = json.dumps(
+        implementation_output,
+        indent=4,
+        ensure_ascii=False
+    )
+
+    return f"""
+You are Agent B: Code Generator.
+
+The previous generated implementation has an error.
+
+Agent A input:
+{agent_a_json}
+
+Previous Agent B output:
+{bad_output_json}
+
+Error message:
+{error_message}
+
+Please repair the implementation.
+
+Return ONLY valid JSON.
+Do not use markdown code blocks.
+Do not add explanations outside JSON.
+
+The JSON output must follow this schema:
+{{
+    "code": "fixed Python code as a string",
+    "filename": "suggested_file_name.py",
+    "language": "python",
+    "dependencies": [],
+    "notes": "short notes for Agent C"
+}}
+
+Rules:
+1. Keep the same project requirement.
+2. Fix the Python syntax problem.
+3. The code must pass ast.parse.
+4. Use simple runnable Python code.
+"""
+
+
+def qwen_repair_implementation(agent_a_data, implementation_output, error_message):
+    """
+    Ask Qwen to repair invalid Agent B implementation output.
+    """
+    load_dotenv()
+
+    api_key = os.getenv("DASHSCOPE_API_KEY")
+
+    if not api_key:
+        raise ValueError("DASHSCOPE_API_KEY is missing. Check your .env file.")
+
+    dashscope.api_key = api_key
+    dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+    prompt = build_repair_prompt(
+        agent_a_data,
+        implementation_output,
+        error_message
+    )
+
+    response = dashscope.Generation.call(
+        model="qwen3.6-max-preview",
+        prompt=prompt
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Qwen repair failed: {response.code} - {response.message}"
+        )
+
+    message = response["output"]["choices"][0]["message"]
+    content = message["content"]
+
+    json_text = extract_json_from_text(content)
+    repaired_output = json.loads(json_text)
+
+    return repaired_output
+
+
 def run_agent_b(input_path, output_dir):
     """
     Main Agent B workflow.
@@ -497,6 +584,25 @@ def run_agent_b(input_path, output_dir):
     syntax_passed, syntax_message = check_python_syntax_from_code(
         implementation_output["code"]
     )
+
+    if not syntax_passed and generation_mode == "qwen_api":
+        try:
+            implementation_output = qwen_repair_implementation(
+                agent_a_data,
+                implementation_output,
+                syntax_message
+            )
+
+            retry_used = True
+            retry_reason = "syntax_error_repaired_by_qwen"
+            generation_mode = "qwen_api_retry"
+
+            syntax_passed, syntax_message = check_python_syntax_from_code(
+                implementation_output["code"]
+            )
+        except Exception as error:
+            retry_used = True
+            retry_reason = f"syntax_repair_failed: {error}"
 
     implementation_json_path, code_file_path = save_implementation_output(
         output_dir,
