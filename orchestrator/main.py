@@ -48,13 +48,39 @@ task_a = Task(
 
     You MUST respond with a valid JSON object following this exact structure:
     {{
-        "requirement_summary": "short summary of what the user wants",
-        "components": ["component1", "component2"],
-        "design_plan": "step by step implementation plan",
-        "dependencies": ["library1", "library2"]
+        "prd": {{
+            "product_overview": "2-3 sentence description of what we're building",
+            "target_users": ["user type 1", "user type 2"],
+            "core_features": [
+                {{"id": "F1", "name": "Feature Name", "description": "One sentence description"}}
+            ],
+            "functional_requirements": [
+                {{"id": "FR1", "requirement": "The system shall..."}}
+            ],
+            "non_functional_requirements": [
+                {{"category": "performance|security|usability", "requirement": "..."}}
+            ],
+            "success_metrics": [
+                {{"metric": "What to measure", "target": "Expected value"}}
+            ]
+        }},
+        "user_stories": [
+            {{
+                "feature_id": "F1",
+                "story": "As a ..., I want ..., so that ...",
+                "acceptance_criteria": ["Given ... When ... Then ..."],
+                "priority": "Must-have"
+            }}
+        ],
+        "architecture_outline": {{
+            "components": [{{"name": "Component", "type": "backend|frontend|database", "responsibility": "What it does"}}],
+            "data_flow": ["Step 1: ...", "Step 2: ..."],
+            "tech_stack": {{"backend": "technology", "justification": "why"}},
+            "architectural_decisions": [{{"decision": "...", "trade_off": "..."}}]
+        }}
     }}
     Respond with JSON only. No extra text.""",
-    expected_output="A valid JSON object with keys: requirement_summary, components, design_plan, dependencies",
+    expected_output="A valid JSON object with keys: prd, user_stories, architecture_outline",
     agent=agent_a
 )
 
