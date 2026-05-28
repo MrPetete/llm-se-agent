@@ -9,10 +9,10 @@ Takes raw user requirements and produces structured design documents:
 Built with CrewAI for the LLM Software Engineering Agent project.
 """
 
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, LLM
 from typing import Dict, Any
 import json
-
+import os
 
 class RequirementsAnalyst:
     """
@@ -22,7 +22,7 @@ class RequirementsAnalyst:
     that Agent B (Code Generator) can consume.
     """
 
-    def __init__(self, llm_model: str = "gpt-4"):
+    def __init__(self, llm_model=None):
         self.llm_model = llm_model
         self.agent = self._create_agent()
 
@@ -37,7 +37,11 @@ class RequirementsAnalyst:
             that developers can immediately start coding without clarification.""",
             verbose=True,
             allow_delegation=False,
-            llm=self.llm_model,
+            llm=self.llm_model or LLM(
+                model="qwen-max",
+                api_key=os.getenv("DASHSCOPE_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+            ),
         )
 
     def create_prd_task(self, requirements_text: str) -> Task:
