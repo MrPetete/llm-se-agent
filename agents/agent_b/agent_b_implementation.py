@@ -451,7 +451,8 @@ def extract_json_from_text(text):
         raise ValueError("No JSON object found in Qwen response")
 
     return text[start:end + 1]
-    
+
+
 def get_qwen_content(response):
     """
     Get generated text from different DashScope/Qwen response formats.
@@ -470,6 +471,7 @@ def get_qwen_content(response):
             return content
 
     raise ValueError(f"Cannot extract Qwen content from response: {output}")
+
 
 def qwen_generate_implementation(agent_a_data):
     """
@@ -497,7 +499,7 @@ def qwen_generate_implementation(agent_a_data):
             f"Qwen API call failed: {response.code} - {response.message}"
         )
 
-    content = get_qwen_content(response)    
+    content = get_qwen_content(response)
 
     json_text = extract_json_from_text(content)
     implementation_output = json.loads(json_text)
