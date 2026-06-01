@@ -19,5 +19,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run lint
         run: pip install flake8 && flake8 .
+      - name: No stale model strings
+        run: |
+          ! grep -rE '"gpt-(4|3\.5)' --include="*.py" --exclude-dir=llm/providers .
       - name: Run tests
         run: pytest
