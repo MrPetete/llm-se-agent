@@ -209,31 +209,31 @@ class RequirementsAnalyst:
         crew = Crew(
             agents=[self.agent],
             tasks=[prd_task],
-            verbose=2,
+            verbose=True,
         )
         prd_result = crew.kickoff()
         prd_json = json.loads(prd_result)
 
         # Validate PRD
         validated_prd_task = self.create_validated_prd_task(prd_json)
-        crew1b = Crew(agents=[self.agent], tasks=[validated_prd_task], verbose=2)
+        crew1b = Crew(agents=[self.agent], tasks=[validated_prd_task], verbose=True)
         validated_prd_result = crew1b.kickoff()
         validated_prd_json = json.loads(validated_prd_result)
 
         # Create and run user stories task
         stories_task = self.create_user_stories_task(validated_prd_json)
-        crew2 = Crew(agents=[self.agent], tasks=[stories_task], verbose=2)
+        crew2 = Crew(agents=[self.agent], tasks=[stories_task], verbose=True)
         stories_result = crew2.kickoff()
 
         # Create and run architecture outline task
         arch_task = self.create_architecture_outline_task(validated_prd_json)
-        crew3 = Crew(agents=[self.agent], tasks=[arch_task], verbose=2)
+        crew3 = Crew(agents=[self.agent], tasks=[arch_task], verbose=True)
         arch_result = crew3.kickoff()
         arch_json = json.loads(arch_result)
 
         # Create and run UML diagram task
         uml_task = self.create_uml_diagram_task(validated_prd_json, arch_json)
-        crew4 = Crew(agents=[self.agent], tasks=[uml_task], verbose=2)
+        crew4 = Crew(agents=[self.agent], tasks=[uml_task], verbose=True)
         uml_result = crew4.kickoff()
         uml_json = json.loads(uml_result)
 
