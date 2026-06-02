@@ -117,6 +117,7 @@ class RequirementsAnalyst:
             - Data flow between components
             - Recommended tech stack (with brief justification)
             - Key architectural decisions and trade-offs
+            - A PlantUML component diagram showing the architecture
 
             Output as structured text with sections.
             """,
@@ -125,7 +126,67 @@ class RequirementsAnalyst:
                 "components": [{"name": str, "type": str, "responsibility": str}],
                 "data_flow": [str],
                 "tech_stack": {"layer": "technology", "justification": str},
-                "architectural_decisions": [{"decision": str, "trade_off": str}]
+                "architectural_decisions": [{"decision": str, "trade_off": str}],
+                "uml_diagram": "PlantUML component diagram as a string"
+            }
+            """,
+            agent=self.agent,
+        )
+
+    def create_uml_diagram_task(self, prd_json: Dict[str, Any], architecture_json: Dict[str, Any]) -> Task:
+        """Create a PlantUML component diagram from the architecture."""
+        return Task(
+            description=f"""
+            Based on this architecture, create a PlantUML component diagram:
+
+            PRD Summary: {prd_json.get("product_overview", "")}
+            Components: {json.dumps(architecture_json.get("components", []), indent=2)}
+            Data Flow: {json.dumps(architecture_json.get("data_flow", []), indent=2)}
+
+            Generate a PlantUML script that:
+            - Shows all system components
+            - Illustrates data flow between components
+            - Uses proper PlantUML syntax (@startuml / @enduml)
+            - Is renderable by any PlantUML renderer
+
+            Output the raw PlantUML script as a string.
+            """,
+            expected_output="""
+            {
+                "plantuml_script": "@startuml\n...\n@enduml"
+            }
+            """,
+            agent=self.agent,
+        )
+
+    def create_validated_prd_task(self, prd_json: Dict[str, Any]) -> Task:
+        """Validate and refine the PRD for quality."""
+        return Task(
+            description=f"""
+            Review and validate this PRD for quality:
+
+            PRD: {json.dumps(prd_json, indent=2)}
+
+            Validation Checklist:
+            [ ] All requirements are testable (no vague terms like "fast", "user-friendly")
+            [ ] Each feature has a clear, independent purpose
+            [ ] Success metrics are quantifiable
+            [ ] No contradictions between requirements
+            [ ] Scope is appropriate for a student project
+
+            If any item fails, revise the PRD section.
+            Output the validated PRD with the same schema.
+            """,
+            expected_output="""
+            {
+                "product_overview": str,
+                "target_users": list[str],
+                "core_features": [{"id": str, "name": str, "description": str}],
+                "functional_requirements": [{"id": str, "requirement": str}],
+                "non_functional_requirements": [{"category": str, "requirement": str}],
+                "success_metrics": [{"metric": str, "target": str}],
+                "validation_passed": bool,
+                "validation_notes": str
             }
             """,
             agent=self.agent,
@@ -139,7 +200,7 @@ class RequirementsAnalyst:
             requirements_text: Raw user input describing what they want to build
 
         Returns:
-            Complete analysis with PRD, user stories, and architecture outline
+            Complete analysis with PRD, user stories, architecture outline, and UML diagram
         """
         # Create tasks
         prd_task = self.create_prd_task(requirements_text)
@@ -153,20 +214,34 @@ class RequirementsAnalyst:
         prd_result = crew.kickoff()
         prd_json = json.loads(prd_result)
 
+        # Validate PRD
+        validated_prd_task = self.create_validated_prd_task(prd_json)
+        crew1b = Crew(agents=[self.agent], tasks=[validated_prd_task], verbose=2)
+        validated_prd_result = crew1b.kickoff()
+        validated_prd_json = json.loads(validated_prd_result)
+
         # Create and run user stories task
-        stories_task = self.create_user_stories_task(prd_json)
+        stories_task = self.create_user_stories_task(validated_prd_json)
         crew2 = Crew(agents=[self.agent], tasks=[stories_task], verbose=2)
         stories_result = crew2.kickoff()
 
         # Create and run architecture outline task
-        arch_task = self.create_architecture_outline_task(prd_json)
+        arch_task = self.create_architecture_outline_task(validated_prd_json)
         crew3 = Crew(agents=[self.agent], tasks=[arch_task], verbose=2)
         arch_result = crew3.kickoff()
+        arch_json = json.loads(arch_result)
+
+        # Create and run UML diagram task
+        uml_task = self.create_uml_diagram_task(validated_prd_json, arch_json)
+        crew4 = Crew(agents=[self.agent], tasks=[uml_task], verbose=2)
+        uml_result = crew4.kickoff()
+        uml_json = json.loads(uml_result)
 
         return {
-            "prd": prd_json,
+            "prd": validated_prd_json,
             "user_stories": json.loads(stories_result),
-            "architecture_outline": json.loads(arch_result),
+            "architecture_outline": arch_json,
+            "uml_diagram": uml_json.get("plantuml_script", ""),
         }
 
 

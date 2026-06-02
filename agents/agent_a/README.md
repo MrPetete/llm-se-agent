@@ -1,12 +1,14 @@
 # Agent A: Requirements Analyst
 
+**Week 4 Update**: Added UML diagram generation and PRD validation
+
 ## Quick Start
 
 ```python
-from agent_a.requirements_analyst import RequirementsAnalyst
+from requirements_analyst import RequirementsAnalyst
 
 # Initialize
-analyst = RequirementsAnalyst(llm_model="gpt-4")
+analyst = RequirementsAnalyst()
 
 # Analyze requirements
 user_input = """
@@ -20,6 +22,7 @@ result = analyst.analyze(user_input)
 print("PRD:", result["prd"])
 print("User Stories:", result["user_stories"])
 print("Architecture:", result["architecture_outline"])
+print("UML Diagram:", result["uml_diagram"])
 ```
 
 ## Files
@@ -41,21 +44,42 @@ Agent A outputs JSON conforming to M1's shared data contract:
     "core_features": [{"id": "F1", "name": "...", "description": "..."}],
     "functional_requirements": [{"id": "FR1", "requirement": "..."}],
     "non_functional_requirements": [{"category": "...", "requirement": "..."}],
-    "success_metrics": [{"metric": "...", "target": "..."}]
+    "success_metrics": [{"metric": "...", "target": "..."}],
+    "validation_passed": true,
+    "validation_notes": "..."
   },
-  "user_stories": [...],
-  "architecture_outline": {...}
+  "user_stories": [
+    {"feature_id": "F1", "story": "As a...", "acceptance_criteria": [...], "priority": "Must-have"}
+  ],
+  "architecture_outline": {
+    "components": [...],
+    "data_flow": [...],
+    "tech_stack": {...},
+    "architectural_decisions": [...]
+  },
+  "uml_diagram": "@startuml\n...\n@enduml"
 }
 ```
+
+## Features (Week 4)
+
+| Feature | Description |
+|---------|-------------|
+| PRD Generation | Transforms raw requirements into structured PRD |
+| Validation | Automatically validates PRD for testability and scope |
+| User Stories | Generates user stories with acceptance criteria |
+| Architecture Outline | System components, tech stack, data flow |
+| UML Diagram | PlantUML component diagram for visualization |
 
 ## M2 Role Reference
 
 This module fulfills **Member 2 (Agent A: Requirements Analyst)** from the team roadmap:
 
-- **Week 1-2**: Learn CrewAI, build initial PRD generator
-- **Week 3**: Refine prompts with few-shot examples
-- **Week 4**: Add architecture outline and validation
-- **Week 5**: Integration with M1's orchestrator
-- **Week 6**: Documentation and technical report
-
-See the technical report in the docs folder for implementation details.
+| Week | Status | Deliverable |
+|------|--------|-------------|
+| Week 1 | ✅ Done | Environment setup, CrewAI learning, initial prompt experiments |
+| Week 2 | ✅ Done | Agent A prototype - PRD generation from raw requirements |
+| Week 3 | ✅ Done | Prompt refinement with few-shot examples, test scenarios |
+| Week 4 | ✅ Done | UML diagram generation, PRD validation, output polish |
+| Week 5 | Pending | Integration with M1's orchestrator |
+| Week 6 | Pending | Documentation and technical report |

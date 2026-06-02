@@ -142,7 +142,8 @@ Output Format (JSON):
     },
     "architectural_decisions": [
         {"decision": "What decision was made", "trade_off": "What was sacrificed"}
-    ]
+    ],
+    "uml_diagram": "PlantUML component diagram as a string"
 }
 
 Consider:
@@ -153,18 +154,71 @@ Consider:
 """
 
 # =============================================================================
-# VALIDATION PROMPT (for Week 3-4 refinement)
+# UML DIAGRAM PROMPT (Week 4)
+# =============================================================================
+
+UML_DIAGRAM_SYSTEM_PROMPT = """
+You are a software architect skilled in PlantUML diagramming.
+
+Generate a PlantUML component diagram from the architecture specification.
+
+Requirements:
+- Use @startuml and @enduml tags
+- Define each component with proper PlantUML syntax
+- Show relationships between components (uses, sends, receives)
+- Keep the diagram clean and readable (max 10-15 components)
+- Use meaningful colors or stereotypes if helpful
+
+Example format:
+```
+@startuml
+[Component A] --> [Component B]
+[Component B] --> [(Database)]
+@enduml
+```
+"""
+
+# =============================================================================
+# VALIDATION PROMPT (Week 4)
 # =============================================================================
 
 VALIDATION_PROMPT = """
 Review the generated PRD for quality:
 
-Checklist:
+Validation Checklist:
 [ ] All requirements are testable (no vague terms like "fast", "user-friendly")
 [ ] Each feature has a clear, independent purpose
 [ ] Success metrics are quantifiable
 [ ] No contradictions between requirements
 [ ] Scope is appropriate for a student project (not enterprise-scale)
 
-If any check fails, revise the PRD.
+For each item that fails, revise the PRD section.
+
+Output Format:
+{
+    "validated_prd": { ... same schema as PRD ... },
+    "validation_passed": true/false,
+    "issues_found": ["list of issues that were fixed"],
+    "notes": "Any remaining concerns"
+}
+"""
+
+# =============================================================================
+# OUTPUT FORMATTING GUIDELINES (Week 4 Polish)
+# =============================================================================
+
+OUTPUT_FORMATTING_GUIDELINES = """
+For consistent, high-quality output formatting:
+
+1. JSON Keys: Always use snake_case (e.g., "product_overview", not "productOverview")
+2. IDs: Use prefix + number format (F1, F2, FR1, FR2, US1, US2)
+3. Lists: Use bullet points for user types, numbered lists for requirements
+4. Language: Use active voice ("The system shall...") not passive ("It should be...")
+5. Testability: Every requirement must have a clear pass/fail criterion
+6. Scope: If the request is too large, identify an MVP subset
+
+Common issues to avoid:
+- Vague terms: "fast" → "response time < 200ms"
+- Unclear users: "users" → "registered customers", "administrators"
+- Untestable metrics: "good user experience" → "task completion rate > 80%"
 """
