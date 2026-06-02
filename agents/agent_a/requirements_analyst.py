@@ -14,6 +14,7 @@ from typing import Dict, Any
 import json
 import os
 
+
 class RequirementsAnalyst:
     """
     Agent A - Requirements Analyst
@@ -247,7 +248,7 @@ class RequirementsAnalyst:
 
 # Example usage
 if __name__ == "__main__":
-    analyst = RequirementsAnalyst(llm_model="gpt-4")
+    analyst = RequirementsAnalyst(llm_model="qwen-max")
 
     sample_input = """
     I want to build a task management app where users can create tasks,

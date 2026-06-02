@@ -45,21 +45,52 @@ INPUT: "I need a weather app that shows current temperature and forecasts"
 
 OUTPUT:
 {
-    "product_overview": "A mobile weather application providing real-time temperature data and multi-day forecasts for user-selected locations.",
-    "target_users": ["Mobile users wanting quick weather checks", "Travelers planning trips", "Outdoor activity enthusiasts"],
+    "product_overview": (
+        "A mobile weather application providing real-time temperature data "
+        "and multi-day forecasts for user-selected locations."
+    ),
+    "target_users": [
+        "Mobile users wanting quick weather checks",
+        "Travelers planning trips",
+        "Outdoor activity enthusiasts"
+    ],
     "core_features": [
-        {"id": "F1", "name": "Current Weather Display", "description": "Shows real-time temperature and conditions for selected location"},
-        {"id": "F2", "name": "Multi-day Forecast", "description": "Displays 7-day weather forecast with high/low temperatures"},
-        {"id": "F3", "name": "Location Management", "description": "Allows users to save and switch between multiple locations"}
+        {
+            "id": "F1", "name": "Current Weather Display",
+            "description": "Shows real-time temperature and conditions for selected location"
+        },
+        {
+            "id": "F2", "name": "Multi-day Forecast",
+            "description": "Displays 7-day weather forecast with high/low temperatures"
+        },
+        {
+            "id": "F3", "name": "Location Management",
+            "description": "Allows users to save and switch between multiple locations"
+        }
     ],
     "functional_requirements": [
-        {"id": "FR1", "requirement": "The system shall fetch weather data from a weather API every 30 minutes"},
-        {"id": "FR2", "requirement": "The system shall display temperature in both Celsius and Fahrenheit"},
-        {"id": "FR3", "requirement": "The system shall allow users to save up to 10 favorite locations"}
+        {
+            "id": "FR1",
+            "requirement": "The system shall fetch weather data from a weather API every 30 minutes"
+        },
+        {
+            "id": "FR2",
+            "requirement": "The system shall display temperature in both Celsius and Fahrenheit"
+        },
+        {
+            "id": "FR3",
+            "requirement": "The system shall allow users to save up to 10 favorite locations"
+        }
     ],
     "non_functional_requirements": [
-        {"category": "performance", "requirement": "Weather data must load within 2 seconds on 4G connection"},
-        {"category": "usability", "requirement": "Users shall be able to view current weather within 2 taps from home screen"}
+        {
+            "category": "performance",
+            "requirement": "Weather data must load within 2 seconds on 4G connection"
+        },
+        {
+            "category": "usability",
+            "requirement": "Users shall be able to view current weather within 2 taps from home screen"
+        }
     ],
     "success_metrics": [
         {"metric": "Daily active users", "target": "10,000 within first month"},
@@ -72,19 +103,50 @@ INPUT: "Build an e-commerce site for selling handmade jewelry"
 
 OUTPUT:
 {
-    "product_overview": "An e-commerce platform enabling artisans to sell handmade jewelry directly to customers, with product catalog, shopping cart, and secure checkout.",
-    "target_users": ["Handmade jewelry artisans looking to sell online", "Customers seeking unique handcrafted jewelry", "Gift shoppers"],
+    "product_overview": (
+        "An e-commerce platform enabling artisans to sell handmade jewelry "
+        "directly to customers, with product catalog, shopping cart, and secure checkout."
+    ),
+    "target_users": [
+        "Handmade jewelry artisans looking to sell online",
+        "Customers seeking unique handcrafted jewelry",
+        "Gift shoppers"
+    ],
     "core_features": [
-        {"id": "F1", "name": "Product Catalog", "description": "Browse and search jewelry items with filters by category, price, and material"},
-        {"id": "F2", "name": "Shopping Cart", "description": "Add/remove items and manage quantities before checkout"},
-        {"id": "F3", "name": "Secure Checkout", "description": "Process payments with encrypted transaction handling"},
-        {"id": "F4", "name": "Seller Dashboard", "description": "Artisans can manage inventory and view sales analytics"}
+        {
+            "id": "F1", "name": "Product Catalog",
+            "description": "Browse and search jewelry items with filters by category, price, and material"
+        },
+        {
+            "id": "F2", "name": "Shopping Cart",
+            "description": "Add/remove items and manage quantities before checkout"
+        },
+        {
+            "id": "F3", "name": "Secure Checkout",
+            "description": "Process payments with encrypted transaction handling"
+        },
+        {
+            "id": "F4", "name": "Seller Dashboard",
+            "description": "Artisans can manage inventory and view sales analytics"
+        }
     ],
     "functional_requirements": [
-        {"id": "FR1", "requirement": "The system shall support product search by keyword, category, price range, and material"},
-        {"id": "FR2", "requirement": "The system shall integrate with Stripe for payment processing"},
-        {"id": "FR3", "requirement": "The system shall send order confirmation emails to customers"},
-        {"id": "FR4", "requirement": "Sellers shall be able to upload product images (max 5 per product)"}
+        {
+            "id": "FR1",
+            "requirement": "The system shall support product search by keyword, category, price range, and material"
+        },
+        {
+            "id": "FR2",
+            "requirement": "The system shall integrate with Stripe for payment processing"
+        },
+        {
+            "id": "FR3",
+            "requirement": "The system shall send order confirmation emails to customers"
+        },
+        {
+            "id": "FR4",
+            "requirement": "Sellers shall be able to upload product images (max 5 per product)"
+        }
     ],
     "non_functional_requirements": [
         {"category": "security", "requirement": "All payment transactions must use TLS 1.3 encryption"},

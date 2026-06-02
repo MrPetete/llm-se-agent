@@ -75,7 +75,7 @@ try:
     # Save full output
     with open("test_output.json", "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
-    print(f"\nFull output saved to: test_output.json")
+    print("\nFull output saved to: test_output.json")
 
 except Exception as e:
     print(f"\nERROR: {e}")
