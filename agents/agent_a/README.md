@@ -28,14 +28,6 @@ print("Architecture:", result["architecture_outline"])
 |------|-------------|
 | `requirements_analyst.py` | Main CrewAI agent implementation |
 | `prompts.py` | Prompt templates with few-shot examples |
-| `test_scenarios.py` | 7 test scenarios for validation |
-
-## Running Tests
-
-```bash
-# Run all test scenarios
-python -m agent_a.test_scenarios
-```
 
 ## Output Schema
 
@@ -66,4 +58,4 @@ This module fulfills **Member 2 (Agent A: Requirements Analyst)** from the team 
 - **Week 5**: Integration with M1's orchestrator
 - **Week 6**: Documentation and technical report
 
-See `docs/agent_a_technical_report.md` for the full technical report.
+See the technical report in the docs folder for implementation details.
