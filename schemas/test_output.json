@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TestOutput",
+  "description": "Output produced by Agent C (Tester & Debugger) after generating and running a pytest suite against Agent B's implementation output.",
+  "type": "object",
+  "properties": {
+    "tested_file": {
+      "type": "string",
+      "description": "Filename of the Agent B module under test (e.g. product_manager.py)"
+    },
+    "language": {
+      "type": "string",
+      "description": "Programming language of the code under test",
+      "default": "python"
+    },
+    "test_code": {
+      "type": "string",
+      "description": "The generated pytest module as a string"
+    },
+    "test_file": {
+      "type": "string",
+      "description": "Path where the generated test file was written"
+    },
+    "syntax_check": {
+      "type": "string",
+      "description": "ast.parse result for the generated test code ('passed' or an error message)"
+    },
+    "mode": {
+      "type": "string",
+      "description": "How tests were generated: qwen_api or mock_generator_fallback",
+      "enum": ["qwen_api", "qwen_api_retry", "mock_generator_fallback"]
+    },
+    "retry_used": {
+      "type": "boolean",
+      "description": "Whether a retry or fallback was triggered during generation"
+    },
+    "retry_reason": {
+      "type": "string",
+      "description": "Reason a retry/fallback was used, or 'none'"
+    },
+    "summary": {
+      "type": "object",
+      "description": "Pass/fail counts from the sandbox run",
+      "properties": {
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "required": ["passed", "failed", "total"]
+    },
+    "execution": {
+      "type": "object",
+      "description": "Detailed sandbox execution result",
+      "properties": {
+        "executed": { "type": "boolean" },
+        "timed_out": { "type": "boolean" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "total": { "type": "integer" },
+        "failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test": { "type": "string" },
+              "outcome": { "type": "string" },
+              "traceback_summary": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["executed", "passed", "failed", "total", "failures"]
+    }
+  },
+  "required": ["tested_file", "language", "test_code", "syntax_check", "mode", "summary", "execution"]
+}
