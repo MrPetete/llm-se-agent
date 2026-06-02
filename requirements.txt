@@ -1,4 +1,21 @@
+# Core framework + LLM (M1 / M2 / M3 / orchestrator)
 crewai
-python-dotenv
-pytest
 dashscope
+
+# LLM wrapper + CLI + config (M5)
+openai==2.36.0
+tenacity==9.1.4
+python-dotenv==1.2.2
+pydantic-settings==2.14.1
+typer==0.26.4
+rich==15.0.0
+
+# Tooling / tests (CI)
+pytest==9.0.3
+flake8==7.3.0
+
+# Notes:
+# - crewai/dashscope left unpinned to match the team venv; pin if the team
+#   standardises on specific versions.
+# - openai is required even on Qwen: the wrapper and CrewAI's LLM() both use
+#   the OpenAI-compatible DashScope endpoint.
