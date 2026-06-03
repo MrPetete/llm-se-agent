@@ -37,9 +37,9 @@ def run_pipeline(prompt: str, output_dir: str = "./outputs", run_test: bool = Tr
         dict with keys: "result" (final output text) and "run_dir" (path written).
     """
     # Lazy import: constructing the crew is a side effect we only want at call time.
-    from orchestrator.main import crew
+    from orchestrator.main import run_pipeline
 
-    result = crew.kickoff(inputs={"user_input": prompt})
+    result = run_pipeline(prompt)
 
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     run_dir = Path(output_dir) / stamp

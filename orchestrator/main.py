@@ -2,28 +2,20 @@ from crewai import Agent, Task, Crew, LLM
 from dotenv import load_dotenv
 import os
 import sys
+import json
 
-# ── Use M5's wrapper config ──
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from llm.wrapper import ask  # M5's wrapper for direct calls if needed
+from agents.agent_a.requirements_analyst import RequirementsAnalyst
 
 load_dotenv()
 os.environ["OPENAI_API_KEY"] = "sk-fake-key-not-used"
 
-# ── LLM for CrewAI agents (uses same DashScope config as M5's wrapper) ──
+# ── LLM for placeholder agents B and C (Week 4 will swap in M3/M4 real agents) ──
 qwen_llm = LLM(
     model="qwen-max",
     api_key=os.getenv("DASHSCOPE_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
-
-# ── Agents ──
-agent_a = Agent(
-    role="Requirements Analyst",
-    goal="Analyze software requirements and produce a structured JSON design plan",
-    backstory="You are a senior software analyst who breaks down requirements clearly and always responds in valid JSON.",
-    verbose=True,
-    llm=qwen_llm
 )
 
 agent_b = Agent(
@@ -42,87 +34,68 @@ agent_c = Agent(
     llm=qwen_llm
 )
 
-# ── Tasks ──
-task_a = Task(
-    description="""Analyze this software requirement: {user_input}
 
-    You MUST respond with a valid JSON object following this exact structure:
-    {{
-        "prd": {{
-            "product_overview": "2-3 sentence description of what we're building",
-            "target_users": ["user type 1", "user type 2"],
-            "core_features": [
-                {{"id": "F1", "name": "Feature Name", "description": "One sentence description"}}
-            ],
-            "functional_requirements": [
-                {{"id": "FR1", "requirement": "The system shall..."}}
-            ],
-            "non_functional_requirements": [
-                {{"category": "performance|security|usability", "requirement": "..."}}
-            ],
-            "success_metrics": [
-                {{"metric": "What to measure", "target": "Expected value"}}
-            ]
-        }},
-        "user_stories": [
-            {{
-                "feature_id": "F1",
-                "story": "As a ..., I want ..., so that ...",
-                "acceptance_criteria": ["Given ... When ... Then ..."],
-                "priority": "Must-have"
-            }}
-        ],
-        "architecture_outline": {{
-            "components": [{{"name": "Component", "type": "backend|frontend|database", "responsibility": "What it does"}}],
-            "data_flow": ["Step 1: ...", "Step 2: ..."],
-            "tech_stack": {{"backend": "technology", "justification": "why"}},
-            "architectural_decisions": [{{"decision": "...", "trade_off": "..."}}]
-        }}
-    }}
-    Respond with JSON only. No extra text.""",
-    expected_output="A valid JSON object with keys: prd, user_stories, architecture_outline",
-    agent=agent_a
-)
+def run_pipeline(user_input: str) -> str:
+    """Run the full A -> B -> C pipeline for a given user requirement.
 
-task_b = Task(
-    description="""You are given a structured design plan from the Requirements Analyst.
-    Read it carefully and write complete, working Python code that implements it.
+    Stage 1 uses M2's real RequirementsAnalyst and saves analysis_output.json.
+    Stages 2-3 use placeholder CrewAI agents until M3/M4 are wired in (Week 4).
+    """
+    # ── Stage 1: M2's real Agent A ──
+    print("\n===== STAGE 1: AGENT A (Requirements Analysis) =====")
+    analyst = RequirementsAnalyst()
+    analysis = analyst.analyze(user_input)
 
-    The design plan is provided in the context above.
+    os.makedirs("outputs", exist_ok=True)
+    with open("outputs/analysis_output.json", "w", encoding="utf-8") as f:
+        json.dump(analysis, f, indent=4, ensure_ascii=False)
+    print("Agent A output saved -> outputs/analysis_output.json")
 
-    Your response must include:
-    - The full Python code
-    - The filename to save it as
-    - Any pip dependencies needed""",
-    expected_output="Complete working Python code with filename and dependencies listed",
-    agent=agent_b,
-    context=[task_a]  # ← This is the key change: task_b receives task_a's output
-)
+    analysis_summary = json.dumps(analysis, ensure_ascii=False, indent=2)
 
-task_c = Task(
-    description="""You are given Python code written by a developer.
-    Your job is to:
-    1. Review the code for bugs
-    2. Write pytest test cases for it
-    3. Identify any issues and suggest fixes
-    4. Provide a final verdict: PASS or FAIL
+    # ── Stage 2: Placeholder Agent B (inject real analysis as context) ──
+    task_b = Task(
+        description=f"""You are given a structured design plan from the Requirements Analyst.
 
-    The code is provided in the context above.""",
-    expected_output="A test report with: test cases, bug analysis, fixes applied, and final PASS/FAIL verdict",
-    agent=agent_c,
-    context=[task_a, task_b]  # ← task_c receives both previous outputs
-)
+        Here is the analysis output (PRD, user stories, architecture):
+        {analysis_summary}
 
-# ── Crew ──
-crew = Crew(
-    agents=[agent_a, agent_b, agent_c],
-    tasks=[task_a, task_b, task_c],
-    verbose=True
-)
+        Read it carefully and write complete, working Python code that implements it.
+        Your response must include:
+        - The full Python code
+        - The filename to save it as
+        - Any pip dependencies needed""",
+        expected_output="Complete working Python code with filename and dependencies listed",
+        agent=agent_b,
+    )
 
-# ── Entry point ──
+    # ── Stage 3: Placeholder Agent C ──
+    task_c = Task(
+        description="""You are given Python code written by a developer.
+        Your job is to:
+        1. Review the code for bugs
+        2. Write pytest test cases for it
+        3. Identify any issues and suggest fixes
+        4. Provide a final verdict: PASS or FAIL
+
+        The code is provided in the context above.""",
+        expected_output="A test report with: test cases, bug analysis, fixes applied, and final PASS/FAIL verdict",
+        agent=agent_c,
+        context=[task_b],
+    )
+
+    crew = Crew(
+        agents=[agent_b, agent_c],
+        tasks=[task_b, task_c],
+        verbose=True,
+    )
+
+    result = crew.kickoff()
+    return str(result)
+
+
 if __name__ == "__main__":
     user_input = input("Enter your software requirement: ")
-    result = crew.kickoff(inputs={"user_input": user_input})
+    result = run_pipeline(user_input)
     print("\n===== FINAL OUTPUT =====")
     print(result)

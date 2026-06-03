@@ -13,6 +13,16 @@ from crewai import Agent, Task, Crew, LLM
 from typing import Dict, Any
 import json
 import os
+import re
+
+
+def _parse_crew_output(result) -> any:
+    """Convert CrewOutput to parsed JSON, stripping markdown fences if present."""
+    text = str(result).strip()
+    text = re.sub(r"^```json\s*", "", text)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text).strip()
+    return json.loads(text)
 
 
 class RequirementsAnalyst:
@@ -213,13 +223,13 @@ class RequirementsAnalyst:
             verbose=True,
         )
         prd_result = crew.kickoff()
-        prd_json = json.loads(prd_result)
+        prd_json = _parse_crew_output(prd_result)
 
         # Validate PRD
         validated_prd_task = self.create_validated_prd_task(prd_json)
         crew1b = Crew(agents=[self.agent], tasks=[validated_prd_task], verbose=True)
         validated_prd_result = crew1b.kickoff()
-        validated_prd_json = json.loads(validated_prd_result)
+        validated_prd_json = _parse_crew_output(validated_prd_result)
 
         # Create and run user stories task
         stories_task = self.create_user_stories_task(validated_prd_json)
@@ -230,19 +240,19 @@ class RequirementsAnalyst:
         arch_task = self.create_architecture_outline_task(validated_prd_json)
         crew3 = Crew(agents=[self.agent], tasks=[arch_task], verbose=True)
         arch_result = crew3.kickoff()
-        arch_json = json.loads(arch_result)
+        arch_json = _parse_crew_output(arch_result)
 
         # Create and run UML diagram task
         uml_task = self.create_uml_diagram_task(validated_prd_json, arch_json)
         crew4 = Crew(agents=[self.agent], tasks=[uml_task], verbose=True)
         uml_result = crew4.kickoff()
-        uml_json = json.loads(uml_result)
+        uml_text = str(uml_result).strip()
 
         return {
             "prd": validated_prd_json,
-            "user_stories": json.loads(stories_result),
+            "user_stories": _parse_crew_output(stories_result),
             "architecture_outline": arch_json,
-            "uml_diagram": uml_json.get("plantuml_script", ""),
+            "uml_diagram": uml_text,
         }
 
 
