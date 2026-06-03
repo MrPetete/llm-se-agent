@@ -18,14 +18,13 @@ def read_json_file(file_path):
 
 def validate_analysis_output(agent_a_data):
     """
-    Validate Agent A output using the required fields from analysis_output.json.
-    This is a lightweight validation without external libraries.
+    Validate Agent A output using the updated analysis_output.json schema.
+    Agent A now provides PRD, user stories, and architecture outline.
     """
     required_fields = [
-        "requirement_summary",
-        "components",
-        "design_plan",
-        "dependencies"
+        "prd",
+        "user_stories",
+        "architecture_outline"
     ]
 
     missing_fields = []
@@ -37,31 +36,39 @@ def validate_analysis_output(agent_a_data):
     if missing_fields:
         return False, f"Missing required fields: {missing_fields}"
 
-    if not isinstance(agent_a_data["requirement_summary"], str):
-        return False, "requirement_summary must be a string"
+    if not isinstance(agent_a_data["prd"], dict):
+        return False, "prd must be an object"
 
-    if not isinstance(agent_a_data["components"], list):
-        return False, "components must be a list"
+    if not isinstance(agent_a_data["user_stories"], list):
+        return False, "user_stories must be a list"
 
-    if not isinstance(agent_a_data["design_plan"], str):
-        return False, "design_plan must be a string"
-
-    if not isinstance(agent_a_data["dependencies"], list):
-        return False, "dependencies must be a list"
+    if not isinstance(agent_a_data["architecture_outline"], dict):
+        return False, "architecture_outline must be an object"
 
     return True, "Agent A output is valid"
 
 
 def detect_project_topic(agent_a_data):
     """
-    Detect the project topic from Agent A requirement summary.
+    Detect the project topic from the updated Agent A PRD output.
     This helps Agent B choose the filename and class name.
     """
-    text = (
-        agent_a_data.get("requirement_summary", "") + " " +
-        agent_a_data.get("design_plan", "") + " " +
-        " ".join(agent_a_data.get("components", []))
-    ).lower()
+    prd = agent_a_data.get("prd", {})
+    architecture = agent_a_data.get("architecture_outline", {})
+
+    core_features = prd.get("core_features", [])
+    functional_requirements = prd.get("functional_requirements", [])
+
+    text_parts = [
+        prd.get("product_overview", ""),
+        architecture.get("data_flow", ""),
+        " ".join(core_features) if isinstance(core_features, list) else str(core_features),
+        " ".join(functional_requirements)
+        if isinstance(functional_requirements, list)
+        else str(functional_requirements)
+    ]
+
+    text = " ".join(text_parts).lower()
 
     if "product" in text:
         return "product", "ProductManager", "product_manager.py"
@@ -74,6 +81,9 @@ def detect_project_topic(agent_a_data):
 
     if "employee" in text:
         return "employee", "EmployeeManager", "employee_manager.py"
+
+    if "login" in text or "user" in text or "password" in text:
+        return "user", "UserManager", "user_manager.py"
 
     return "item", "ItemManager", "item_manager.py"
 
@@ -353,19 +363,47 @@ def save_implementation_output(output_dir, implementation_output):
 def build_qwen_prompt(agent_a_data):
     """
     Build prompt for Qwen to generate Agent B implementation output.
+    The input follows the updated Agent A analysis_output.json schema.
     """
+    prd = agent_a_data.get("prd", {})
+    user_stories = agent_a_data.get("user_stories", [])
+    architecture = agent_a_data.get("architecture_outline", {})
+
+    product_overview = prd.get("product_overview", "")
+    core_features = prd.get("core_features", [])
+    functional_requirements = prd.get("functional_requirements", [])
+    data_flow = architecture.get("data_flow", "")
+
     agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
 
     return f"""
-You are Agent B: Code Generator in an LLM-based Software Engineering Agent system.
+You are Agent B: Code Generator in an LLM-based Software Engineering Agent
+system.
 
-Your input is Agent A analysis output. It follows this schema:
-- requirement_summary: string
-- components: array of strings
-- design_plan: string
-- dependencies: array of strings
+Your input is Agent A analysis output following the updated schema:
+- prd: object with product_overview, core_features, functional_requirements
+- user_stories: array of user stories
+- architecture_outline: object with architecture and data flow information
 
-Your task is to generate Python implementation code.
+Your task is to generate Python implementation code based on the PRD and
+architecture.
+
+Important Agent A fields:
+
+Product overview:
+{product_overview}
+
+Core features:
+{core_features}
+
+Functional requirements:
+{functional_requirements}
+
+Architecture data flow:
+{data_flow}
+
+User stories:
+{user_stories}
 
 You must return ONLY valid JSON.
 Do not use markdown code blocks.
@@ -384,11 +422,12 @@ Rules:
 1. Generate clean and runnable Python code.
 2. Use simple student-friendly code.
 3. Do not use external libraries unless required.
-4. Include a simple command-line demo under if __name__ == "__main__".
+4. Include a command-line demo under if __name__ == "__main__".
 5. Make sure the code can pass ast.parse syntax checking.
 6. The filename should match the project topic.
+7. The code should implement the core features and requirements.
 
-Agent A input:
+Full Agent A input:
 {agent_a_json}
 """
 
@@ -414,6 +453,26 @@ def extract_json_from_text(text):
     return text[start:end + 1]
 
 
+def get_qwen_content(response):
+    """
+    Get generated text from different DashScope/Qwen response formats.
+    """
+    output = response.get("output", {})
+
+    text = output.get("text")
+    if text:
+        return text
+
+    choices = output.get("choices")
+    if choices:
+        message = choices[0].get("message", {})
+        content = message.get("content")
+        if content:
+            return content
+
+    raise ValueError(f"Cannot extract Qwen content from response: {output}")
+
+
 def qwen_generate_implementation(agent_a_data):
     """
     Generate Agent B implementation output using Qwen / DashScope API.
@@ -431,7 +490,7 @@ def qwen_generate_implementation(agent_a_data):
     prompt = build_qwen_prompt(agent_a_data)
 
     response = dashscope.Generation.call(
-        model="qwen3.6-max-preview",
+        model="qwen-turbo",
         prompt=prompt
     )
 
@@ -440,13 +499,98 @@ def qwen_generate_implementation(agent_a_data):
             f"Qwen API call failed: {response.code} - {response.message}"
         )
 
-    message = response["output"]["choices"][0]["message"]
-    content = message["content"]
+    content = get_qwen_content(response)
 
     json_text = extract_json_from_text(content)
     implementation_output = json.loads(json_text)
 
     return implementation_output
+
+
+def build_repair_prompt(agent_a_data, implementation_output, error_message):
+    """
+    Build prompt for Qwen to repair invalid generated Python code.
+    """
+    agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
+    bad_output_json = json.dumps(
+        implementation_output,
+        indent=4,
+        ensure_ascii=False
+    )
+
+    return f"""
+You are Agent B: Code Generator.
+
+The previous generated implementation has an error.
+
+Agent A input:
+{agent_a_json}
+
+Previous Agent B output:
+{bad_output_json}
+
+Error message:
+{error_message}
+
+Please repair the implementation.
+
+Return ONLY valid JSON.
+Do not use markdown code blocks.
+Do not add explanations outside JSON.
+
+The JSON output must follow this schema:
+{{
+    "code": "fixed Python code as a string",
+    "filename": "suggested_file_name.py",
+    "language": "python",
+    "dependencies": [],
+    "notes": "short notes for Agent C"
+}}
+
+Rules:
+1. Keep the same project requirement.
+2. Fix the Python syntax problem.
+3. The code must pass ast.parse.
+4. Use simple runnable Python code.
+"""
+
+
+def qwen_repair_implementation(agent_a_data, implementation_output, error_message):
+    """
+    Ask Qwen to repair invalid Agent B implementation output.
+    """
+    load_dotenv()
+
+    api_key = os.getenv("DASHSCOPE_API_KEY")
+
+    if not api_key:
+        raise ValueError("DASHSCOPE_API_KEY is missing. Check your .env file.")
+
+    dashscope.api_key = api_key
+    dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+    prompt = build_repair_prompt(
+        agent_a_data,
+        implementation_output,
+        error_message
+    )
+
+    response = dashscope.Generation.call(
+        model="qwen-turbo",
+        prompt=prompt
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Qwen repair failed: {response.code} - {response.message}"
+        )
+
+    content = get_qwen_content(response)
+
+    json_text = extract_json_from_text(content)
+    repaired_output = json.loads(json_text)
+
+    return repaired_output
 
 
 def run_agent_b(input_path, output_dir):
@@ -470,6 +614,9 @@ def run_agent_b(input_path, output_dir):
             "stage": "validate_analysis_output"
         }
 
+    retry_used = False
+    retry_reason = "none"
+
     try:
         implementation_output = qwen_generate_implementation(agent_a_data)
         generation_mode = "qwen_api"
@@ -477,6 +624,8 @@ def run_agent_b(input_path, output_dir):
         print(f"Qwen generation failed, fallback to mock mode: {error}")
         implementation_output = mock_llm_generate_implementation(agent_a_data)
         generation_mode = "mock_llm_fallback"
+        retry_used = True
+        retry_reason = "qwen_api_failed_fallback_to_mock"
 
     implementation_valid, implementation_message = validate_implementation_output(
         implementation_output
@@ -492,6 +641,25 @@ def run_agent_b(input_path, output_dir):
     syntax_passed, syntax_message = check_python_syntax_from_code(
         implementation_output["code"]
     )
+
+    if not syntax_passed and generation_mode == "qwen_api":
+        try:
+            implementation_output = qwen_repair_implementation(
+                agent_a_data,
+                implementation_output,
+                syntax_message
+            )
+
+            retry_used = True
+            retry_reason = "syntax_error_repaired_by_qwen"
+            generation_mode = "qwen_api_retry"
+
+            syntax_passed, syntax_message = check_python_syntax_from_code(
+                implementation_output["code"]
+            )
+        except Exception as error:
+            retry_used = True
+            retry_reason = f"syntax_repair_failed: {error}"
 
     implementation_json_path, code_file_path = save_implementation_output(
         output_dir,
@@ -509,7 +677,9 @@ def run_agent_b(input_path, output_dir):
         "language": implementation_output["language"],
         "dependencies": implementation_output["dependencies"],
         "syntax_check": syntax_message,
-        "mode": generation_mode
+        "mode": generation_mode,
+        "retry_used": retry_used,
+        "retry_reason": retry_reason
     }
 
     return result
