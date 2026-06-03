@@ -30,9 +30,7 @@ import ast
 import json
 import os
 import re
-import subprocess
 import sys
-import tempfile
 
 try:
     from dotenv import load_dotenv
@@ -295,83 +293,12 @@ def qwen_generate_tests(impl, analysis=None):
 
 
 # --------------------------------------------------------------------------- #
-# 6. Sandbox runner (subprocess + timeout, --json-report)                     #
+# 6. Sandbox runner  (relocated to the `sandbox` package in M5 Week 4)        #
 # --------------------------------------------------------------------------- #
-def run_tests_in_sandbox(code, test_code, module_filename, timeout=30):
-    """
-    Execute the generated pytest suite in an isolated subprocess with a timeout.
-    Returns structured pass/fail data parsed from pytest-json-report.
-    """
-    workdir = tempfile.mkdtemp(prefix="agent_c_sandbox_")
-    code_path = os.path.join(workdir, module_filename)
-    test_path = os.path.join(workdir, "test_generated.py")
-    report_path = os.path.join(workdir, "report.json")
-
-    with open(code_path, "w", encoding="utf-8") as f:
-        f.write(code)
-    with open(test_path, "w", encoding="utf-8") as f:
-        f.write(test_code)
-
-    cmd = [
-        sys.executable, "-m", "pytest", test_path,
-        "-q", "--json-report", f"--json-report-file={report_path}",
-    ]
-    try:
-        proc = subprocess.run(
-            cmd, cwd=workdir, capture_output=True, text=True, timeout=timeout
-        )
-        timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        return {
-            "executed": False,
-            "timed_out": True,
-            "passed": 0, "failed": 0, "total": 0,
-            "failures": [],
-            "stdout": (exc.stdout or "")[-2000:] if exc.stdout else "",
-        }
-
-    summary = {"passed": 0, "failed": 0, "total": 0}
-    failures = []
-    if os.path.exists(report_path):
-        with open(report_path, "r", encoding="utf-8") as f:
-            report = json.load(f)
-        s = report.get("summary", {})
-        summary["passed"] = s.get("passed", 0)
-        summary["failed"] = s.get("failed", 0)
-        summary["total"] = s.get("total", 0)
-        for t in report.get("tests", []):
-            if t.get("outcome") != "passed":
-                call = t.get("call", {})
-                failures.append({
-                    "test": t.get("nodeid", ""),
-                    "outcome": t.get("outcome", ""),
-                    "traceback_summary": (
-                        call.get("longrepr", "") or ""
-                    )[-600:],
-                })
-
-    # If pytest exited non-zero but wrote no report (collection error / import
-    # error), synthesize a failure entry so the debugger can see it.
-    if proc.returncode != 0 and summary["total"] == 0:
-        stderr_out = (proc.stderr or proc.stdout or "")[-1500:]
-        failures = [{
-            "test": "test_generated.py",
-            "outcome": "error",
-            "traceback_summary": f"ERROR collecting test_generated.py\n{stderr_out}",
-        }]
-        summary["failed"] = 1
-        summary["total"] = 1
-
-    return {
-        "executed": True,
-        "timed_out": timed_out,
-        "passed": summary["passed"],
-        "failed": summary["failed"],
-        "total": summary["total"],
-        "failures": failures,
-        "return_code": proc.returncode,
-        "stdout": proc.stdout[-2000:],
-    }
+# The runner now lives in sandbox/ so it can route between Docker-isolated
+# execution and the subprocess fallback. Re-exported here so existing imports
+# (`from agents.agent_c.agent_c_tester import run_tests_in_sandbox`) keep working.
+from sandbox.sandbox_runner import run_tests_in_sandbox  # noqa: E402,F401
 
 
 # --------------------------------------------------------------------------- #
