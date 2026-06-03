@@ -12,6 +12,7 @@ rich==15.0.0
 
 # Tooling / tests (CI)
 pytest==9.0.3
+pytest-json-report==1.5.0
 flake8==7.3.0
 
 # Notes:

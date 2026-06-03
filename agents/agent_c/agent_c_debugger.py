@@ -37,16 +37,19 @@ import sys
 # package (agents.agent_c.agent_c_debugger, e.g. from the orchestrator or
 # pytest) or directly from inside the agent_c/ folder.
 try:
+    # Preferred canonical path: the runner now lives in the sandbox package
+    # (M5 Week 4). It routes Docker-first with a subprocess fallback.
+    from sandbox.sandbox_runner import run_tests_in_sandbox
+except ImportError:  # running directly from inside agents/agent_c/ (repo root not on path)
+    from agent_c_tester import run_tests_in_sandbox
+
+try:
     from agents.agent_c.agent_c_tester import (
-        run_tests_in_sandbox,
-        qwen_generate_tests,        # not used directly, kept for symmetry
         extract_code_from_text,
         _DASHSCOPE_AVAILABLE,
     )
 except ImportError:  # running directly from inside agents/agent_c/
     from agent_c_tester import (
-        run_tests_in_sandbox,
-        qwen_generate_tests,
         extract_code_from_text,
         _DASHSCOPE_AVAILABLE,
     )

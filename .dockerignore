@@ -1,0 +1,23 @@
+# Keep the sandbox build context minimal and free of secrets/artifacts.
+# Note: the sandbox image copies ONLY sandbox/requirements-sandbox.txt, so even
+# if something slips through, no project source/secrets enter the image. This
+# also speeds up the build for the main Dockerfile.
+.env
+.env.*
+*.env
+logs/
+outputs/
+output/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.pytest_cache/
+.venv/
+venv/
+tests/
+docs/
+
+# Do NOT ignore these -- the sandbox build needs them:
+!Dockerfile.sandbox
+!sandbox/requirements-sandbox.txt
