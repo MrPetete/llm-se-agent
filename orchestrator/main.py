@@ -99,4 +99,17 @@ if __name__ == "__main__":
     user_input = input("Enter your software requirement: ")
     result = crew.kickoff(inputs={"user_input": user_input})
     print("\n===== FINAL OUTPUT =====")
+    
     print(result)
+
+    print(result)
+    
+class SoftwareEngineeringCrew:
+    def __init__(self):
+        # М1-ийн өөрсдийнх нь үүсгэсэн crew объектыг энд холбоно
+        self.crew = crew 
+
+    def run(self, user_input):
+        # Чиний скриптээс ирэх prompt-ийг AI руу илгээнэ
+        result = self.crew.kickoff(inputs={"user_input": user_input})
+        return str(result)
