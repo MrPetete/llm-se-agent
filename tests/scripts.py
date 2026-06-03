@@ -7,9 +7,9 @@ from pylint import lint
 from io import StringIO
 from dotenv import load_dotenv  
 
-from orchestrator.main import SoftwareEngineeringCrew 
+from orchestrator.main import run_pipeline
 
-load_dotenv() # .env файл дахь API Key-ийг идэвхжүүлэх
+load_dotenv()
 
 class AdvancedTestHarness:
     """
@@ -17,8 +17,7 @@ class AdvancedTestHarness:
     Evaluates LLM-generated code across 8 specific test cases.
     """
 
-    def __init__(self, orchestrator_api):
-        self.orchestrator = orchestrator_api
+    def __init__(self):
         self.results = []
         # All 8 scenarios based on the QA Lead's strategy
         self.scenarios = [
@@ -51,8 +50,8 @@ class AdvancedTestHarness:
             print(f"[{case['id']}] Testing: {case['name']}...")
             
             start_time = time.time()
-            # 1. AI-аас хариултыг авна
-            output_response = self.orchestrator.run(case['prompt']) 
+            # 1. Get output from the pipeline
+            output_response = run_pipeline(case['prompt'])
             duration = round(time.time() - start_time, 2)
             
             # 2. ЭНЭ ХЭСГИЙГ ХУУЛЖ ТАВИНА (JSON-оос кодыг салгах)
@@ -101,12 +100,5 @@ class AdvancedTestHarness:
         print("💾 Full 8-scenario report saved to 'qa_metrics_report.json'.")
 
 if __name__ == "__main__":
-    # 1. М1-ийн бодит Orchestrator-ийг үүсгэх
-    # М1-ийн код qwen-max ашиглахаар тохируулагдсан байгаа
-    orchestrator = SoftwareEngineeringCrew() 
-    
-    # 2. Өөрийн Test Harness-ийг бодит системтэй холбох
-    harness = AdvancedTestHarness(orchestrator)
-    
-    # 3. 8 сценари бүхий бенчмаркийг эхлүүлэх
+    harness = AdvancedTestHarness()
     harness.run_benchmark()

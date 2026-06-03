@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DebugOutput",
+  "description": "Output produced by Agent C (Tester & Debugger) in the debugging stage. Given a failing test_output.json from the tester, Agent C analyzes the failures, attempts a fix on the code under test, and re-runs the tests to verify the fix.",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "description": "Overall result of the debug stage.",
+      "enum": ["no_failures", "fix_verified", "fix_unverified"]
+    },
+    "tested_file": {
+      "type": "string",
+      "description": "Filename of the Agent B module that was debugged (e.g. product_manager.py)."
+    },
+    "mode": {
+      "type": "string",
+      "description": "How the fix was generated: Qwen repair or the deterministic mock fixer fallback.",
+      "enum": ["qwen_repair", "mock_fixer_fallback"]
+    },
+    "retry_used": {
+      "type": "boolean",
+      "description": "Whether a fallback was triggered during fix generation (mirrors Agent B's convention)."
+    },
+    "retry_reason": {
+      "type": "string",
+      "description": "Reason a fallback was used, or 'none'."
+    },
+    "fix_syntax_check": {
+      "type": "string",
+      "description": "ast.parse result for the proposed fixed code ('passed' or an error message)."
+    },
+    "fix_attempted": {
+      "type": "boolean",
+      "description": "False only when status is no_failures; true whenever a fix was generated."
+    },
+    "applied_fixes": {
+      "type": "array",
+      "description": "Human-readable list of the transforms applied or recommended.",
+      "items": { "type": "string" }
+    },
+    "analysis": {
+      "type": "array",
+      "description": "Per-failure root-cause analysis derived from the tester's failure list.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "test": { "type": "string", "description": "pytest node id of the failing test." },
+          "outcome": { "type": "string", "description": "pytest outcome (e.g. failed, error)." },
+          "category": {
+            "type": "string",
+            "description": "Root-cause category inferred from the traceback.",
+            "enum": [
+              "collection_error", "ImportError", "AttributeError", "TypeError",
+              "NameError", "KeyError", "IndexError", "AssertionError", "runtime_error"
+            ]
+          },
+          "explanation": { "type": "string", "description": "Plain-language explanation of the likely root cause." },
+          "traceback_summary": { "type": "string", "description": "Trimmed traceback text from the sandbox run." }
+        },
+        "required": ["test", "category", "explanation"]
+      }
+    },
+    "before": {
+      "type": "object",
+      "description": "Pass/fail counts reported by the tester before the fix.",
+      "properties": {
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "required": ["passed", "failed", "total"]
+    },
+    "after": {
+      "type": "object",
+      "description": "Pass/fail counts after re-running the tests against the fixed code.",
+      "properties": {
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "required": ["passed", "failed", "total"]
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "True only if tests actually executed (total > 0) and zero failed after the fix."
+    },
+    "fixed_code": {
+      "type": "string",
+      "description": "The corrected module that was re-verified in the sandbox (omitted when status is no_failures)."
+    }
+  },
+  "required": ["status", "tested_file", "analysis", "fix_attempted", "verified"]
+}
