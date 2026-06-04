@@ -1,97 +1,89 @@
-from crewai import Agent, Task, Crew, LLM
 from dotenv import load_dotenv
 import os
 import sys
 import json
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from llm.wrapper import ask  # M5's wrapper for direct calls if needed
 from agents.agent_a.requirements_analyst import RequirementsAnalyst
+from agents.agent_b.agent_b_implementation import run_agent_b
+from agents.agent_c.agent_c_tester import run_agent_c
+from agents.agent_c.agent_c_debugger import run_agent_c_debugger
 
 load_dotenv()
-os.environ["OPENAI_API_KEY"] = "sk-fake-key-not-used"
-
-# ── LLM for placeholder agents B and C (Week 4 will swap in M3/M4 real agents) ──
-qwen_llm = LLM(
-    model="qwen-max",
-    api_key=os.getenv("DASHSCOPE_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
-
-agent_b = Agent(
-    role="Software Developer",
-    goal="Write clean, working Python code based on the JSON design plan provided by the analyst",
-    backstory="You are an experienced Python developer who reads a structured design plan and writes production-ready code.",
-    verbose=True,
-    llm=qwen_llm
-)
-
-agent_c = Agent(
-    role="QA Engineer",
-    goal="Write pytest tests for the provided code, run analysis, and return a verified test report",
-    backstory="You are a meticulous QA engineer who receives code from a developer and produces a full test report.",
-    verbose=True,
-    llm=qwen_llm
-)
 
 
 def run_pipeline(user_input: str) -> str:
     """Run the full A -> B -> C pipeline for a given user requirement.
 
-    Stage 1 uses M2's real RequirementsAnalyst and saves analysis_output.json.
-    Stages 2-3 use placeholder CrewAI agents until M3/M4 are wired in (Week 4).
+    Stage 1: M2's real RequirementsAnalyst  -> outputs/analysis_output.json
+    Stage 2: M3's real Agent B              -> outputs/implementation_output.json
+    Stage 3: M4's real Agent C tester       -> outputs/test_output.json
+    Stage 4: M4's real Agent C debugger     -> outputs/debug_output.json
     """
+    os.makedirs("outputs", exist_ok=True)
+
     # ── Stage 1: M2's real Agent A ──
     print("\n===== STAGE 1: AGENT A (Requirements Analysis) =====")
     analyst = RequirementsAnalyst()
     analysis = analyst.analyze(user_input)
 
-    os.makedirs("outputs", exist_ok=True)
     with open("outputs/analysis_output.json", "w", encoding="utf-8") as f:
         json.dump(analysis, f, indent=4, ensure_ascii=False)
     print("Agent A output saved -> outputs/analysis_output.json")
 
-    analysis_summary = json.dumps(analysis, ensure_ascii=False, indent=2)
+    # ── Stage 2: M3's real Agent B ──
+    print("\n===== STAGE 2: AGENT B (Code Generation) =====")
+    b_result = run_agent_b("outputs/analysis_output.json", "outputs")
+    if not b_result.get("success"):
+        print(f"Agent B failed: {b_result.get('message')}")
+    else:
+        print(f"Agent B output saved -> {b_result.get('implementation_json')}")
+        print(f"Mode: {b_result.get('mode')} | Syntax: {b_result.get('syntax_check')}")
 
-    # ── Stage 2: Placeholder Agent B (inject real analysis as context) ──
-    task_b = Task(
-        description=f"""You are given a structured design plan from the Requirements Analyst.
-
-        Here is the analysis output (PRD, user stories, architecture):
-        {analysis_summary}
-
-        Read it carefully and write complete, working Python code that implements it.
-        Your response must include:
-        - The full Python code
-        - The filename to save it as
-        - Any pip dependencies needed""",
-        expected_output="Complete working Python code with filename and dependencies listed",
-        agent=agent_b,
+    # ── Stage 3: M4's real Agent C tester ──
+    print("\n===== STAGE 3: AGENT C (Test Generation) =====")
+    c_result = run_agent_c(
+        "outputs/implementation_output.json",
+        "outputs",
+        analysis_path="outputs/analysis_output.json",
     )
+    if not c_result.get("success"):
+        print(f"Agent C tester: some tests failed (mode: {c_result.get('mode')})")
+    else:
+        print(f"Agent C tester finished -> outputs/test_output.json")
+    print(f"Mode: {c_result.get('mode')} | Tests: {c_result.get('tests_passed')} passed, {c_result.get('tests_failed')} failed")
 
-    # ── Stage 3: Placeholder Agent C ──
-    task_c = Task(
-        description="""You are given Python code written by a developer.
-        Your job is to:
-        1. Review the code for bugs
-        2. Write pytest test cases for it
-        3. Identify any issues and suggest fixes
-        4. Provide a final verdict: PASS or FAIL
+    # ── Stage 4: M4's real Agent C debugger ──
+    print("\n===== STAGE 4: AGENT C (Debugger) =====")
+    d_result = run_agent_c_debugger("outputs/test_output.json", "outputs")
+    status = d_result.get("status")
+    verified = d_result.get("verified", False)
+    print(f"Debugger status: {status} | Verified: {verified}")
+    if d_result.get("fix_attempted"):
+        before = d_result.get("before", {})
+        after = d_result.get("after", {})
+        print(f"Before fix: {before.get('passed')} passed / {before.get('failed')} failed")
+        print(f"After fix:  {after.get('passed')} passed / {after.get('failed')} failed")
 
-        The code is provided in the context above.""",
-        expected_output="A test report with: test cases, bug analysis, fixes applied, and final PASS/FAIL verdict",
-        agent=agent_c,
-        context=[task_b],
-    )
-
-    crew = Crew(
-        agents=[agent_b, agent_c],
-        tasks=[task_b, task_c],
-        verbose=True,
-    )
-
-    result = crew.kickoff()
-    return str(result)
+    return json.dumps({
+        "agent_b": {
+            "mode": b_result.get("mode"),
+            "filename": b_result.get("filename"),
+            "syntax_check": b_result.get("syntax_check"),
+        },
+        "agent_c_tester": {
+            "mode": c_result.get("mode"),
+            "tests_passed": c_result.get("tests_passed"),
+            "tests_failed": c_result.get("tests_failed"),
+            "tests_total": c_result.get("tests_total"),
+        },
+        "agent_c_debugger": {
+            "status": status,
+            "verified": verified,
+            "mode": d_result.get("mode"),
+            "applied_fixes": d_result.get("applied_fixes", []),
+        },
+    }, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

@@ -251,6 +251,30 @@ def extract_code_from_text(text):
     return text.strip()
 
 
+def patch_missing_imports(test_code):
+    """Add missing stdlib imports that Qwen commonly forgets."""
+    stdlib_checks = [
+        ("time", r"\btime\s*\."),
+        ("datetime", r"\bdatetime\s*\."),
+        ("os", r"\bos\s*\."),
+        ("sys", r"\bsys\s*\."),
+        ("json", r"\bjson\s*\."),
+        ("re", r"\bre\s*\."),
+        ("random", r"\brandom\s*\."),
+        ("string", r"\bstring\s*\."),
+        ("hashlib", r"\bhashlib\s*\."),
+    ]
+    lines = test_code.splitlines()
+    existing = {l.strip() for l in lines if l.startswith("import ") or l.startswith("from ")}
+    to_add = []
+    for module, pattern in stdlib_checks:
+        if re.search(pattern, test_code) and f"import {module}" not in existing:
+            to_add.append(f"import {module}")
+    if not to_add:
+        return test_code
+    return "\n".join(to_add) + "\n" + test_code
+
+
 def qwen_generate_tests(impl, analysis=None):
     if not _DASHSCOPE_AVAILABLE:
         raise RuntimeError("dashscope not installed")
@@ -326,6 +350,18 @@ def run_tests_in_sandbox(code, test_code, module_filename, timeout=30):
                     )[-600:],
                 })
 
+    # If pytest exited non-zero but wrote no report (collection error / import
+    # error), synthesize a failure entry so the debugger can see it.
+    if proc.returncode != 0 and summary["total"] == 0:
+        stderr_out = (proc.stderr or proc.stdout or "")[-1500:]
+        failures = [{
+            "test": "test_generated.py",
+            "outcome": "error",
+            "traceback_summary": f"ERROR collecting test_generated.py\n{stderr_out}",
+        }]
+        summary["failed"] = 1
+        summary["total"] = 1
+
     return {
         "executed": True,
         "timed_out": timed_out,
@@ -359,6 +395,7 @@ def run_agent_c(input_path, output_dir, analysis_path=None):
     retry_reason = "none"
     try:
         test_code = qwen_generate_tests(impl, analysis)
+        test_code = patch_missing_imports(test_code)
     except Exception as error:  # noqa: BLE001
         test_code = mock_generate_tests(impl)
         mode = "mock_generator_fallback"
