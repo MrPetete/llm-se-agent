@@ -95,19 +95,7 @@ def run_pipeline(user_input: str) -> str:
 
 
 if __name__ == "__main__":
-    # ... өмнөх код ...
     user_input = input("Enter your software requirement: ")
     result = run_pipeline(user_input)
     print("\n===== FINAL OUTPUT =====")
-    print(result) # <--- Зөвхөн энэ мөрийг үлдээгээрэй
-
-class crew:
-    def __init__(self, crew):
-        # M1-ийн өөрсдийнх нь үүсгэсэн crew объектыг энд холбоно
-        self.crew = crew
-
-    def run(self, user_input):
-        # Чиний скриптээс ирэх prompt-ийг AI руу илгээнэ
-        result = self.crew.kickoff(inputs={"user_input": user_input})
-        return str(result)
-  
+    print(result)

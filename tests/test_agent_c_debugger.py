@@ -65,7 +65,7 @@ def test_analyze_failures_handles_empty_list():
 # --------------------------------------------------------------------------- #
 def test_debug_output_schema_fields():
     schema = json.loads(
-        Path("schemas/debug_output.json").read_text(encoding="utf-8")
+        Path("schemas/debug_output_schema.json").read_text(encoding="utf-8")
     )
     assert schema["title"] == "DebugOutput"
     for field in ["status", "tested_file", "analysis", "fix_attempted", "verified"]:
