@@ -1,0 +1,5 @@
+# Minimal dependencies for the Agent C sandbox image (Dockerfile.sandbox).
+# Kept separate from the root requirements.txt so the sandbox image stays small
+# and self-contained -- it must NOT depend on the host Anaconda environment.
+pytest==9.0.3
+pytest-json-report==1.5.0
