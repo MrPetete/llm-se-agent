@@ -76,6 +76,18 @@ def run_tests_in_subprocess(code, test_code, module_filename, timeout=30):
                     )[-600:],
                 })
 
+    # If pytest exited non-zero but wrote no report (collection error / import
+    # error), synthesize a failure entry so the debugger can see it.
+    if proc.returncode != 0 and summary["total"] == 0:
+        stderr_out = (proc.stderr or proc.stdout or "")[-1500:]
+        failures = [{
+            "test": "test_generated.py",
+            "outcome": "error",
+            "traceback_summary": f"ERROR collecting test_generated.py\n{stderr_out}",
+        }]
+        summary["failed"] = 1
+        summary["total"] = 1
+
     return {
         "executed": True,
         "timed_out": timed_out,

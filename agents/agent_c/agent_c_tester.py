@@ -263,7 +263,7 @@ def patch_missing_imports(test_code):
         ("hashlib", r"\bhashlib\s*\."),
     ]
     lines = test_code.splitlines()
-    existing = {l.strip() for l in lines if l.startswith("import ") or l.startswith("from ")}
+    existing = {line.strip() for line in lines if line.startswith("import ") or line.startswith("from ")}
     to_add = []
     for module, pattern in stdlib_checks:
         if re.search(pattern, test_code) and f"import {module}" not in existing:
