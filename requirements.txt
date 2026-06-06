@@ -1,14 +1,14 @@
 # Core framework + LLM (M1 / M2 / M3 / orchestrator)
-crewai
+crewai==0.114.0
 dashscope
 
 # LLM wrapper + CLI + config (M5)
 openai==1.99.9
 tenacity==9.1.4
-python-dotenv==1.2.2
-pydantic-settings==2.14.1
-typer==0.26.4
-rich==15.0.0
+python-dotenv==1.0.1
+pydantic-settings==2.8.1
+typer==0.15.2
+rich==13.9.4
 
 # Tooling / tests (CI)
 pytest==9.0.3
