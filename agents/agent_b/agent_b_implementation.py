@@ -415,17 +415,39 @@ The JSON output must follow this schema:
     "filename": "suggested_file_name.py",
     "language": "python",
     "dependencies": [],
-    "notes": "short notes for Agent C"
+    "notes": "human-readable testing notes including main class name, public methods, and suggested test cases"
 }}
 
 Rules:
 1. Generate clean and runnable Python code.
 2. Use simple student-friendly code.
 3. Do not use external libraries unless required.
-4. Include a command-line demo under if __name__ == "__main__".
-5. Make sure the code can pass ast.parse syntax checking.
-6. The filename should match the project topic.
-7. The code should implement the core features and requirements.
+4. Prefer class-based implementation with clear public methods.
+5. Separate business logic from command-line input/output.
+6. CLI input/output is allowed only as a demo under if __name__ == "__main__".
+7. Make sure the code can pass ast.parse syntax checking.
+8. The filename should match the project topic.
+9. The code should implement the core features and requirements.
+10. Make the generated code easy for Agent C to test automatically.
+11. Do not put core logic only inside input() loops.
+12. Public methods should accept parameters and return clear results.
+13. Public methods should return a tuple in this format: (bool, message).
+14. Use method names that Agent C can recognize when possible:
+    - add_*
+    - delete_*
+    - update_*
+    - search_*
+    - list_*
+15. For user/auth/login systems, include public methods when applicable:
+    - add_user(username, password)
+    - login(username, password)
+    - search_user(username)
+    - update_user_password(username, new_password)
+    - delete_user(username)
+    - list_users()
+    - unlock_account(username)
+16. Keep auth-specific methods if useful, but also expose add_user/search_user/update_user/delete_user/list_users style methods so Agent C can generate tests more easily.
+17. The notes field is for human-readable testing guidance. The generated code structure and public methods are more important for Agent C.
 
 Full Agent A input:
 {agent_a_json}
