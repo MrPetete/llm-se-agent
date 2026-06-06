@@ -27,6 +27,7 @@ BENCHMARK_CASES = [
     {"id": "TC-08", "name": "Multi-module Project", "prompt": "Create a structured python project with data utils, main app, and requirements."}
 ]
 
+
 class AdvancedTestHarness:
     def __init__(self, crew_object):
         self.crew = crew_object
@@ -56,19 +57,19 @@ class AdvancedTestHarness:
     def run_pylint_on_string(self, code_string, filename, case_id):
         """[M7 安全保护系统] 运行 Pylint 评分。若遭遇 astroid-error 崩溃，则启动 AST 语法兜底机制"""
         report_log_path = f"pylint_report_{case_id}.txt"
-        
+
         if not code_string:
             with open(report_log_path, "w", encoding="utf-8") as out_file:
                 out_file.write(f"Pylint Failed for {case_id}: Code string is empty.")
             print(f"    ℹ️ [{case_id}] Pylint 评分: 0.0/10 (AI 生成代码为空)")
             return 0.0
-        
+
         # 写入临时文件供 Pylint 扫描
         with open(filename, "w", encoding="utf-8") as f:
             f.write(code_string)
-            
+
         try:
-            # 【Засвар 1 & 2】: python -m pylint ашиглаж PATH алдаанаас сэргийлэв. 
+            # 【Засвар 1 & 2】: python -m pylint ашиглаж PATH алдаанаас сэргийлэв.
             # shell=True ашиглаж байгаа тул аргументуудыг нэг цогц стринг болгов.
             pylint_cmd = (
                 f'python -m pylint "{filename}" '
@@ -77,7 +78,7 @@ class AdvancedTestHarness:
                 'deprecated-pragma,use-symbolic-message-instead '
                 '--score=y --persistent=n --ignored-modules=data_utils,utils,config'
             )
-            
+
             result = subprocess.run(
                 pylint_cmd,
                 capture_output=True,
@@ -85,13 +86,13 @@ class AdvancedTestHarness:
                 encoding="utf-8",
                 shell=True
             )
-            
+
             pylint_output = (result.stdout or "") + "\n" + (result.stderr or "")
-            
+
             # 保存详细日志以供回溯
             with open(report_log_path, "w", encoding="utf-8") as out_file:
                 out_file.write(pylint_output)
-            
+
             # 【修复关键点 1】：优先拦截 Pylint 自身的崩溃错误 (如 astroid-error)
             if "astroid-error" in pylint_output or "Fatal error" in pylint_output or "AttributeError" in pylint_output:
                 try:
@@ -111,7 +112,7 @@ class AdvancedTestHarness:
                 score = round(max(0.0, score), 2)
                 print(f"    📊 [{case_id}] Pylint 评分: {score}/10")
                 return score
-                
+
             # 若无得分也无崩溃特征，但可以通过标准 AST 解析
             try:
                 ast.parse(code_string)
@@ -120,7 +121,7 @@ class AdvancedTestHarness:
             except SyntaxError:
                 print(f"    📊 [{case_id}] Pylint 评分: 0.0/10 (代码包含语法错误)")
                 return 0.0
-            
+
         except Exception as e:
             with open(report_log_path, "w", encoding="utf-8") as out_file:
                 out_file.write(f"M7 Critical Exception: {str(e)}")
@@ -134,32 +135,32 @@ class AdvancedTestHarness:
                     os.remove(filename)
                 except Exception:
                     pass
-                
+
     def execute_single_case(self, case):
         """执行单个测试场景，全自动测量执行耗时、内存峰值以及代码质量得分"""
         print(f"\n 正在运行自动化基准测试: {case['name']} ({case['id']})...")
-        
+
         start_time = time.time()
         # 捕获大模型运行前的初始内存状态
         mem_before = memory_usage(-1, interval=0.1, timeout=1)[0]
-        
+
         try:
             # 1. 驱动智能体系统运行并获取响应
             raw_response = self.run_crew_with_input(case['prompt'])
             duration = round(time.time() - start_time, 2)
-            
+
             # 捕获运行后的内存，计算差值作为峰值增量
             mem_after = memory_usage(-1, interval=0.1, timeout=1)[0]
             peak_memory = round(max(0.0, mem_after - mem_before), 2)
-            
+
             # 2. 提取生成的 Python 代码并统计行数
             python_code = self.extract_code_from_json(raw_response)
             lines_count = len(python_code.splitlines()) if python_code else 0
-            
+
             # 3. 运行 Pylint 代码审查
             temp_filename = f"temp_{case['id']}.py"
             pylint_score = self.run_pylint_on_string(python_code, temp_filename, case['id'])
-            
+
             # 返回该场景的完整度量数据
             return {
                 "id": case['id'],
@@ -189,19 +190,22 @@ class AdvancedTestHarness:
         for case in BENCHMARK_CASES:
             res = self.execute_single_case(case)
             results.append(res)
-            
+
         # 将结构化测试数据写入本地，供生成周报和前端看板使用
         with open(self.report_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=4, ensure_ascii=False)
-            
+
         print(f"\n 所有基准测试均已执行完毕！报告已成功保存至: '{self.report_path}'")
 
 # 用于对接 Pytest 或 GitHub Actions CI 自动化流水线的触发函数
+
+
 def test_all_benchmarks():
     harness = AdvancedTestHarness(crew)
     harness.run_benchmark()
     # 断言：确保测试完成后成功生成了度量指标报告
     assert os.path.exists(harness.report_path)
+
 
 if __name__ == "__main__":
     # 支持在本地通过命令 `python tests/test_scripts.py` 进行手动独立触发测试
