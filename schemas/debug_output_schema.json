@@ -15,8 +15,13 @@
     },
     "mode": {
       "type": "string",
-      "description": "How the fix was generated: Qwen repair or the deterministic mock fixer fallback.",
-      "enum": ["qwen_repair", "mock_fixer_fallback"]
+      "description": "How the fix was generated: Qwen repair, the deterministic mock fixer fallback, or test_repair when the failure was in Agent C's own generated test file.",
+      "enum": ["qwen_repair", "mock_fixer_fallback", "test_repair"]
+    },
+    "fix_target": {
+      "type": "string",
+      "description": "Which artifact was repaired: the code under test, or Agent C's own generated test file (for collection/import errors).",
+      "enum": ["code_under_test", "test_file"]
     },
     "retry_used": {
       "type": "boolean",
@@ -88,6 +93,10 @@
     "fixed_code": {
       "type": "string",
       "description": "The corrected module that was re-verified in the sandbox (omitted when status is no_failures)."
+    },
+    "fixed_test_code": {
+      "type": "string",
+      "description": "The corrected generated test module, present when fix_target is test_file (a collection/import error was repaired on the test side)."
     }
   },
   "required": ["status", "tested_file", "analysis", "fix_attempted", "verified"]
