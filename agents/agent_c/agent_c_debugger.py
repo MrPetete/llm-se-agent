@@ -46,11 +46,13 @@ except ImportError:  # running directly from inside agents/agent_c/ (repo root n
 try:
     from agents.agent_c.agent_c_tester import (
         extract_code_from_text,
+        patch_missing_imports,
         _DASHSCOPE_AVAILABLE,
     )
 except ImportError:  # running directly from inside agents/agent_c/
     from agent_c_tester import (
         extract_code_from_text,
+        patch_missing_imports,
         _DASHSCOPE_AVAILABLE,
     )
 
@@ -242,6 +244,121 @@ def mock_repair_code(code, analyzed_failures):
 
 
 # --------------------------------------------------------------------------- #
+# 3b. Test-side repair (the failure is in Agent C's OWN generated test file)  #
+# --------------------------------------------------------------------------- #
+# Key insight: a collection_error / ImportError / test-level NameError is
+# almost never a bug in the code under test -- it is a defect in the *generated
+# test file* (a missing stdlib import, a `@patch`/`patch(...)` used without
+# importing unittest.mock, or the module-under-test not being importable by the
+# name the test uses). Repairing the *code* in those cases is a no-op, which is
+# exactly why the debugger used to get stuck at fix_unverified (0/1 -> 0/1).
+#
+# These transforms repair the TEST, not the code. They are conservative and
+# only inject missing imports / a sys.path bootstrap; they never edit assertions
+# or test logic. No schema change -- `fixed_code` still carries the corrected
+# code, and the applied_fixes list records that the test file was repaired.
+
+# Categories whose root cause lives in the generated test module rather than in
+# the code under test.
+_TEST_SIDE_CATEGORIES = {"collection_error", "ImportError"}
+
+
+def _failure_is_test_side(analyzed_failures):
+    """
+    Decide whether the failure(s) point at the generated test file rather than
+    the code under test. True when any failure is a collection/import error, or
+    a NameError raised at test *collection* time (decorator evaluated before any
+    test runs, e.g. `@patch(...)` with unittest.mock not imported).
+    """
+    for a in analyzed_failures:
+        cat = a.get("category", "")
+        tb = a.get("traceback_summary", "") or ""
+        if cat in _TEST_SIDE_CATEGORIES:
+            return True
+        # A NameError surfaced during collection (no test ran yet) is a broken
+        # test module, not a code bug. The synthesized collection entry above
+        # already covers most of these, but a raw NameError at import time can
+        # slip through as category NameError.
+        if cat == "NameError" and (
+            "during collection" in tb
+            or "ERROR collecting" in tb
+            or "in <module>" in tb
+        ):
+            return True
+    return False
+
+
+def repair_test_code(test_code, module_filename):
+    """
+    Repair the generated TEST module for the common Agent-C-side defects that
+    cause a collection error. Returns (fixed_test, applied_fixes:list[str]).
+
+    Conservative, deterministic, no network:
+      1. Inject missing stdlib imports the test body uses (reuses the tester's
+         patch_missing_imports: time/hashlib/json/re/os/sys/...).
+      2. If the test uses `@patch` / `patch(`/ `MagicMock(` / `Mock(` but never
+         imports unittest.mock, add `from unittest.mock import patch, MagicMock`.
+      3. If the test imports the module-under-test by name, prepend a sys.path
+         bootstrap so the import resolves regardless of pytest's rootdir. The
+         sandbox writes the module next to the test, so inserting the test's own
+         directory on sys.path makes `from <module> import ...` robust.
+    """
+    applied = []
+    fixed = test_code
+
+    # 1. Missing stdlib imports (e.g. test computes a real hash but forgot
+    #    `import hashlib`). Reuses the exact tester helper for consistency.
+    after_stdlib = patch_missing_imports(fixed)
+    if after_stdlib != fixed:
+        added = [
+            ln for ln in after_stdlib.splitlines()
+            if ln.startswith("import ") and ln not in fixed
+        ]
+        fixed = after_stdlib
+        applied.append(
+            "test-repair: injected missing stdlib import(s) "
+            f"{', '.join(added)} that the generated test used but did not import."
+        )
+
+    # 2. unittest.mock used but not imported -> classic collection NameError on
+    #    `@patch(...)` (the decorator is evaluated at import time).
+    uses_mock = re.search(r"@?\bpatch\s*\(|\bMagicMock\s*\(|\bMock\s*\(", fixed)
+    imports_mock = re.search(
+        r"^\s*(from\s+unittest(\.mock)?\s+import|import\s+unittest\.mock|"
+        r"from\s+mock\s+import|import\s+mock)\b",
+        fixed, flags=re.MULTILINE,
+    )
+    if uses_mock and not imports_mock:
+        fixed = "from unittest.mock import patch, MagicMock, Mock\n" + fixed
+        applied.append(
+            "test-repair: added `from unittest.mock import patch, MagicMock, "
+            "Mock` (the test used patch/Mock at collection time without "
+            "importing it -> NameError during collection)."
+        )
+
+    # 3. Module-under-test import bootstrap. The sandbox writes the module
+    #    beside the test, so put the test file's own dir on sys.path. Idempotent.
+    module = module_filename[:-3] if module_filename.endswith(".py") else module_filename
+    imports_module = re.search(
+        rf"^\s*(from\s+{re.escape(module)}\s+import|import\s+{re.escape(module)})\b",
+        fixed, flags=re.MULTILINE,
+    )
+    already_bootstrapped = "sys.path.insert(0, os.path.dirname(__file__)" in fixed
+    if imports_module and not already_bootstrapped:
+        bootstrap = (
+            "import os, sys\n"
+            "sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\n"
+        )
+        fixed = bootstrap + fixed
+        applied.append(
+            f"test-repair: prepended a sys.path bootstrap so `import {module}` "
+            "resolves to the sandbox copy regardless of pytest rootdir."
+        )
+
+    return fixed, applied
+
+
+# --------------------------------------------------------------------------- #
 # 4. Main debug workflow: analyze -> fix -> verify (fix-verify loop)          #
 # --------------------------------------------------------------------------- #
 def run_agent_c_debugger(test_output_path, output_dir, max_attempts=1):
@@ -279,28 +396,62 @@ def run_agent_c_debugger(test_output_path, output_dir, max_attempts=1):
     # Step 1: analyze.
     analysis = analyze_failures(failures)
 
-    # Step 2: attempt a fix (Qwen, fallback to deterministic mock).
+    # Step 1b: decide which side the failure is on. A collection_error /
+    # ImportError / collection-time NameError is a defect in Agent C's OWN
+    # generated test file, not in the code under test. Repairing the code in
+    # that case is a no-op (the same broken test fails to collect again), which
+    # is exactly the fix_unverified 0/1 -> 0/1 stall. So we repair the TEST.
+    test_side = _failure_is_test_side(analysis)
+
+    # Defaults; overwritten by whichever branch runs.
     mode = "qwen_repair"
     retry_used = False
     retry_reason = "none"
-    try:
-        fixed_code = qwen_repair_code(code, test_code, analysis)
-        applied_fixes = ["qwen_repair: model returned a corrected module."]
-    except Exception as error:  # noqa: BLE001
-        fixed_code, applied_fixes = mock_repair_code(code, analysis)
-        mode = "mock_fixer_fallback"
-        retry_used = True
-        retry_reason = f"qwen_unavailable_fallback_to_mock: {error}"
+    fix_target = "code_under_test"
+    fixed_code = code
+    fixed_test_code = test_code
 
-    # Validate the fixed code parses before we re-run.
+    if test_side:
+        # --- Repair the generated test file deterministically (no network). ---
+        fix_target = "test_file"
+        mode = "test_repair"
+        fixed_test_code, applied_fixes = repair_test_code(test_code, code_filename)
+        if not applied_fixes:
+            # Nothing matched our safe transforms; fall back to the code-repair
+            # path so we still attempt *something* rather than silently stalling.
+            fix_target = "code_under_test"
+            mode = "qwen_repair"
+            try:
+                fixed_code = qwen_repair_code(code, test_code, analysis)
+                applied_fixes = ["qwen_repair: model returned a corrected module."]
+            except Exception as error:  # noqa: BLE001
+                fixed_code, applied_fixes = mock_repair_code(code, analysis)
+                mode = "mock_fixer_fallback"
+                retry_used = True
+                retry_reason = f"qwen_unavailable_fallback_to_mock: {error}"
+    else:
+        # --- Repair the code under test (original behavior). ---
+        try:
+            fixed_code = qwen_repair_code(code, test_code, analysis)
+            applied_fixes = ["qwen_repair: model returned a corrected module."]
+        except Exception as error:  # noqa: BLE001
+            fixed_code, applied_fixes = mock_repair_code(code, analysis)
+            mode = "mock_fixer_fallback"
+            retry_used = True
+            retry_reason = f"qwen_unavailable_fallback_to_mock: {error}"
+
+    # Validate the artifact we changed parses before we re-run.
+    artifact_to_check = fixed_test_code if fix_target == "test_file" else fixed_code
     try:
-        ast.parse(fixed_code)
+        ast.parse(artifact_to_check)
         fix_syntax = "passed"
     except SyntaxError as error:
         fix_syntax = f"failed: {error}"
 
-    # Step 3: verify -- re-run the SAME tests against the fixed code.
-    verify = run_tests_in_sandbox(fixed_code, test_code, code_filename)
+    # Step 3: verify -- re-run in the sandbox. When we repaired the test, run
+    # the (unchanged) code against the FIXED test; otherwise the fixed code
+    # against the original test.
+    verify = run_tests_in_sandbox(fixed_code, fixed_test_code, code_filename)
     verified = (
         verify.get("executed", False)
         and verify.get("total", 0) > 0
@@ -311,6 +462,7 @@ def run_agent_c_debugger(test_output_path, output_dir, max_attempts=1):
         "status": "fix_verified" if verified else "fix_unverified",
         "tested_file": code_filename,
         "mode": mode,
+        "fix_target": fix_target,
         "retry_used": retry_used,
         "retry_reason": retry_reason,
         "fix_syntax_check": fix_syntax,
@@ -329,6 +481,7 @@ def run_agent_c_debugger(test_output_path, output_dir, max_attempts=1):
         },
         "verified": verified,
         "fixed_code": fixed_code,
+        "fixed_test_code": fixed_test_code,
     }
     _write(output_dir, result)
     return result

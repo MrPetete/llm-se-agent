@@ -70,3 +70,64 @@ def test_debug_output_schema_fields():
     assert schema["title"] == "DebugOutput"
     for field in ["status", "tested_file", "analysis", "fix_attempted", "verified"]:
         assert field in schema["required"]
+
+
+# --------------------------------------------------------------------------- #
+# 3. Test-side repair (collection errors are bugs in the generated TEST,      #
+#    not in the code under test). Regression for the Week 4 fix_unverified    #
+#    0/1 -> 0/1 stall reported by M3 in the Stage-4 screenshot.               #
+# --------------------------------------------------------------------------- #
+from agents.agent_c.agent_c_debugger import (  # noqa: E402
+    _failure_is_test_side,
+    repair_test_code,
+)
+
+
+def test_collection_error_is_classified_test_side():
+    analyzed = [{
+        "test": "test_generated.py",
+        "outcome": "error",
+        "category": "collection_error",
+        "explanation": "x",
+        "traceback_summary": "ERROR collecting test_generated.py",
+    }]
+    assert _failure_is_test_side(analyzed) is True
+
+
+def test_assertion_error_is_not_test_side():
+    analyzed = [{
+        "test": "t::test_logic", "outcome": "failed", "category": "AssertionError",
+        "explanation": "x", "traceback_summary": "E assert 1 == 2",
+    }]
+    assert _failure_is_test_side(analyzed) is False
+
+
+def test_repair_test_code_injects_missing_mock_and_stdlib_imports():
+    broken = (
+        "import pytest\n"
+        "from login_system import UserDatabase\n\n"
+        "@patch('login_system.UserDatabase._hash')\n"
+        "def test_login(mock_hash):\n"
+        "    mock_hash.return_value = hashlib.sha256(b'pw').hexdigest()\n"
+        "    assert True\n"
+    )
+    fixed, applied = repair_test_code(broken, "login_system.py")
+    assert "from unittest.mock import" in fixed
+    assert "import hashlib" in fixed
+    assert "sys.path.insert" in fixed
+    assert applied  # something was recorded
+    # the repaired test module must still parse
+    import ast
+    ast.parse(fixed)
+
+
+def test_repair_test_code_is_idempotent_on_clean_test():
+    clean = (
+        "import pytest\n"
+        "from product_manager import ProductManager\n\n"
+        "def test_add(): \n"
+        "    assert ProductManager() is not None\n"
+    )
+    fixed, applied = repair_test_code(clean, "product_manager.py")
+    # No mock / no missing stdlib; only the sys.path bootstrap may be added.
+    assert all("unittest.mock" not in a for a in applied)
