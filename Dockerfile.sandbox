@@ -1,0 +1,21 @@
+# Sandbox image for Agent C: runs untrusted, AI-generated code + its tests.
+#
+# Deliberately minimal. It does NOT copy the project source, .env, logs, or the
+# LLM wrapper -- only the pytest toolchain is installed. The generated module
+# and test files are supplied at run time via a read-only bind mount (/input)
+# and copied into a writable tmpfs (/sandbox) by the run command. See
+# sandbox/docker_runner.py.
+#
+# Build (PowerShell, from the repo root):
+#   docker build -f Dockerfile.sandbox -t llm-se-agent-sandbox:latest .
+FROM python:3.11-slim
+
+# Install only the test toolchain (pytest + json report plugin).
+COPY sandbox/requirements-sandbox.txt /tmp/requirements-sandbox.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-sandbox.txt
+
+# Run as the unprivileged "nobody" user, never root. The actual --user flag is
+# also set at run time; this is defense in depth.
+USER 65534:65534
+
+# No CMD: the runner passes an explicit `sh -c "..."` command at run time.

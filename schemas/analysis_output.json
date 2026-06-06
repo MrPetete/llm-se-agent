@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalysisOutput",
+  "description": "Output produced by Agent A after analyzing a software requirement",
+  "type": "object",
+  "properties": {
+    "prd": {
+      "type": "object",
+      "properties": {
+        "product_overview": { "type": "string" },
+        "target_users": { "type": "array", "items": { "type": "string" } },
+        "core_features": { "type": "array", "items": { "type": "object" } },
+        "functional_requirements": { "type": "array", "items": { "type": "object" } },
+        "non_functional_requirements": { "type": "array", "items": { "type": "object" } },
+        "success_metrics": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "user_stories": { "type": "array", "items": { "type": "object" } },
+    "architecture_outline": { "type": "object" }
+  },
+  "required": ["prd", "user_stories", "architecture_outline"]
+}
