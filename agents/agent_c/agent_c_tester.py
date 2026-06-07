@@ -273,6 +273,48 @@ def patch_missing_imports(test_code):
     return "\n".join(to_add) + "\n" + test_code
 
 
+# Any real-time sleep longer than this many seconds is treated as an attempt to
+# wall-clock-wait for an expiry/timeout path. Such sleeps stall the sandbox and
+# blow the execution timeout (settings.sandbox_timeout_seconds, default 30s),
+# turning a logic test into a misleading "timed_out". We rewrite them to a
+# negligible duration so the test runs; the surrounding assertions still
+# execute. The correct long-term fix is timestamp injection / clock mocking in
+# the code under test, but this guarantees the suite never hangs on a literal
+# multi-hour sleep (e.g. the time.sleep(86401) seen for session-expiry tests).
+_MAX_REAL_SLEEP_SECONDS = 5
+
+
+def neutralize_long_sleeps(test_code, max_seconds=_MAX_REAL_SLEEP_SECONDS):
+    """
+    Replace ``time.sleep(<large numeric literal>)`` calls with a negligible
+    sleep so generated tests can never block the sandbox for minutes/hours.
+
+    Only rewrites *numeric-literal* arguments above ``max_seconds`` (including
+    simple arithmetic on literals like ``86400 + 1``). Sleeps with variable
+    arguments are left untouched -- they cannot be statically bounded, and the
+    sandbox timeout remains the backstop. Returns (possibly) rewritten code.
+    """
+    pattern = re.compile(
+        r"""(\b(?:time\.)?sleep\s*\(\s*)   # call opener: sleep( or time.sleep(
+            ([0-9][0-9_]*(?:\.[0-9]+)?     # leading numeric literal
+             (?:\s*[-+*]\s*[0-9][0-9_]*(?:\.[0-9]+)?)*)  # optional +/-/* literals
+            (\s*\))""",                    # closer
+        re.VERBOSE,
+    )
+
+    def _replace(match):
+        opener, expr, closer = match.group(1), match.group(2), match.group(3)
+        try:
+            value = eval(expr, {"__builtins__": {}}, {})  # literals only
+        except Exception:
+            return match.group(0)
+        if isinstance(value, (int, float)) and value > max_seconds:
+            return f"{opener}0.001{closer}  # auto-neutralized (was {expr})"
+        return match.group(0)
+
+    return pattern.sub(_replace, test_code)
+
+
 def qwen_generate_tests(impl, analysis=None):
     if not _DASHSCOPE_AVAILABLE:
         raise RuntimeError("dashscope not installed")
@@ -342,6 +384,10 @@ def run_agent_c(input_path, output_dir, analysis_path=None):
             mode = "mock_generator_fallback"
             ast.parse(test_code)
             syntax_check = "passed"
+
+    # Neutralize multi-hour real-time sleeps (e.g. time.sleep(86401) emitted for
+    # session-expiry tests) so they cannot stall the sandbox past its timeout.
+    test_code = neutralize_long_sleeps(test_code)
 
     # Run in sandbox.
     run_result = run_tests_in_sandbox(
