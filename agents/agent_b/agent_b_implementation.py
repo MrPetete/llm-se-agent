@@ -446,8 +446,11 @@ Rules:
     - delete_user(username)
     - list_users()
     - unlock_account(username)
-16. Keep auth-specific methods if useful, but also expose add_user/search_user/update_user/delete_user/list_users style methods so Agent C can generate tests more easily.
-17. The notes field is for human-readable testing guidance. The generated code structure and public methods are more important for Agent C.
+16. Keep auth-specific methods if useful.
+17. Also expose add_user, search_user, update_user_password,
+    delete_user, and list_users methods for Agent C tests.
+18. The notes field is for human-readable testing guidance.
+19. Public method structure is more important for Agent C.
 
 Full Agent A input:
 {agent_a_json}
