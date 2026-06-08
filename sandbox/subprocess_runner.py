@@ -1,5 +1,5 @@
 """
-Subprocess sandbox runner.
+Subprocess sandbox runner
 
 RELOCATED body of M4's original ``run_tests_in_sandbox`` from
 ``agents/agent_c/agent_c_tester.py``. Logic preserved (temp dir, pytest
