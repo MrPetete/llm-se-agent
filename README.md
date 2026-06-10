@@ -46,48 +46,6 @@ LLM-Based Software Engineering Agent — CrewAI multi-agent system
 
 所有智能体间通信均通过经过校验的 JSON Schema 进行。编排器（`M1`）负责管理流水线、执行数据合约、处理 CrewAI 任务排序。
 
----
-
-## 仓库结构
-
-```
-llm-se-agent/
-├── orchestrator/
-│   ├── main.py              # CrewAI crew 定义与任务排序
-│   └── pipeline.py          # run_pipeline() 胶水代码（prompt → 输出目录）
-├── agents/
-│   ├── agent_a/             # 需求分析师（CrewAI + Qwen-Max）
-│   │   ├── agent.py
-│   │   ├── tasks.py
-│   │   ├── schemas.py       # Pydantic v2 输出校验
-│   │   └── few_shots.py     # 2 个少样本示例（计算器、待办列表）
-│   ├── agent_b/             # 代码生成器（Qwen API + ast 语法验证）
-│   └── agent_c/             # 测试与调试器（pytest 沙箱 + Qwen 修复）
-├── llm/
-│   ├── wrapper.py           # 统一 LLM 调用接口
-│   └── providers/           # 可插拔提供商注册表（Qwen / OpenAI / Anthropic）
-├── schemas/
-│   ├── analysis_output.json
-│   ├── implementation_output.json
-│   └── test_output.json
-├── scripts/
-│   ├── doctor.py            # 环境验证脚本 — 请先运行此脚本
-│   └── stats.py             # 聚合 logs/llm_calls.jsonl 中的 LLM 调用日志
-├── docs/
-│   ├── technical_report_draft.md
-│   ├── integration_reference.md   # 数据合约、分支规范、智能体接口
-│   ├── style_guide.md
-│   └── usage_guide_outline.md
-├── tests/                   # 单元测试与集成测试
-├── run.py                   # CLI 入口（Typer + Rich）
-├── config.py                # pydantic-settings 配置加载器
-├── docker-compose.yml
-├── Dockerfile
-└── requirements.txt
-```
-
----
-
 ## 快速开始
 
 **1. 克隆仓库并检查环境**
