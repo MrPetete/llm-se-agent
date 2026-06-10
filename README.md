@@ -1,10 +1,6 @@
 # llm-se-agent
 LLM-Based Software Engineering Agent — CrewAI multi-agent system
 
-# llm-se-agent
-
-**基于大语言模型的软件工程智能体 — CrewAI 多智能体系统**
-
 一个 AI 驱动的开发助手，接收自然语言需求，自动完成需求分析、代码生成、测试编写和错误调试——全流程端到端。
 
 ---
