@@ -15,16 +15,20 @@ def log_call(
     provider: str,
     model: str,
     prompt: str,
-    reply: str,
-    usage,
     elapsed: float,
     agent: str | None = None,
+    reply: str | None = None,
+    usage=None,
+    success: bool = True,
+    error: str | None = None,
 ):
     entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "provider": provider,
         "model": model,
         "agent": agent,
+        "success": success,
+        "error": error,
         "prompt_tokens": usage.prompt_tokens if usage else None,
         "completion_tokens": usage.completion_tokens if usage else None,
         "total_tokens": usage.total_tokens if usage else None,
@@ -33,7 +37,10 @@ def log_call(
     }
     with LOG_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    _logger.info(
-        f"[LLM] {provider}/{model} | {elapsed}s | "
-        f"{usage.total_tokens if usage else '?'} tokens"
-    )
+    if success:
+        _logger.info(
+            f"[LLM] {provider}/{model} | {elapsed}s | "
+            f"{usage.total_tokens if usage else '?'} tokens"
+        )
+    else:
+        _logger.warning(f"[LLM] {provider}/{model} | FAILED after {elapsed}s | {error}")

@@ -19,5 +19,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run lint
         run: pip install flake8 && flake8 .
+      - name: Block non-Qwen model strings
+        run: '! grep -rE "\"(gpt-[0-9]|claude-|gemini-|text-davinci|text-embedding-|o1-)" --include="*.py" --exclude-dir=providers .'
       - name: Run tests
         run: pytest
