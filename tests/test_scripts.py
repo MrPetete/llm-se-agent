@@ -1,19 +1,15 @@
 import os
 import sys
-import time
-import json
-import ast
-import re
-import subprocess
-from memory_profiler import memory_usage
 
-# 根据 M5 的建议，直接从 orchestrator 中导入实际的 crew 对象
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-try:
-    from orchestrator.main import crew
-except ImportError:
-    # 如果因为路径问题导致导入失败，再次尝试动态调整路径并导入
-    from orchestrator.main import crew
+
+import time  # noqa: E402
+import json  # noqa: E402
+import ast  # noqa: E402
+import re  # noqa: E402
+import subprocess  # noqa: E402
+from memory_profiler import memory_usage  # noqa: E402
+from orchestrator.main import run_pipeline  # noqa: E402
 
 # 8 个核心基准测试场景 (Benchmark Cases)
 BENCHMARK_CASES = [
@@ -61,14 +57,12 @@ BENCHMARK_CASES = [
 
 
 class AdvancedTestHarness:
-    def __init__(self, crew_object):
-        self.crew = crew_object
+    def __init__(self):
         self.report_path = "qa_metrics_report.json"
 
     def run_crew_with_input(self, prompt):
         """调用 M1 提供的接入点，将测试场景的 Prompt 发送给大模型智能体"""
-        # 严格按照 M1 系统的输入契约，将 user_input 作为参数传入 kickoff
-        result = self.crew.kickoff(inputs={"user_input": prompt})
+        result = run_pipeline(prompt)
         return str(result)
 
     def extract_code_from_json(self, raw_output):
@@ -233,7 +227,7 @@ class AdvancedTestHarness:
 
 
 def test_all_benchmarks():
-    harness = AdvancedTestHarness(crew)
+    harness = AdvancedTestHarness()
     harness.run_benchmark()
     # 断言：确保测试完成后成功生成了度量指标报告
     assert os.path.exists(harness.report_path)
@@ -241,5 +235,5 @@ def test_all_benchmarks():
 
 if __name__ == "__main__":
     # 支持在本地通过命令 `python tests/test_scripts.py` 进行手动独立触发测试
-    harness = AdvancedTestHarness(crew)
+    harness = AdvancedTestHarness()
     harness.run_benchmark()
