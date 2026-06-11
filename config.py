@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     # Docker is preferred but not mandatory, so the pipeline/CI never breaks.
     sandbox_require_docker: bool = False
 
+    # Pricing — USD per 1M tokens (source: Alibaba Cloud Model Studio, 2026-06-10)
+    # qwen-max: flat rate. qwen-plus: ≤128K tier (lowest). qwen-turbo: flat rate.
+    # Update these if the team switches models or Alibaba changes rates.
+    # Reference: https://www.alibabacloud.com/help/en/model-studio/model-pricing
+    llm_cost_input_per_1m: float = 0.345   # qwen-max default
+    llm_cost_output_per_1m: float = 1.377  # qwen-max default
+
     # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 

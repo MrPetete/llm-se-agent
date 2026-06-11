@@ -36,16 +36,29 @@ def ask(
 
     provider = REGISTRY[provider_name]
     start = time.time()
-    reply, usage = provider.call(prompt, model=model, system=system)
-    elapsed = round(time.time() - start, 3)
-
-    log_call(
-        provider=provider_name,
-        model=model or provider.DEFAULT_MODEL,
-        prompt=prompt,
-        reply=reply,
-        usage=usage,
-        elapsed=elapsed,
-        agent=agent,
-    )
-    return reply
+    try:
+        reply, usage = provider.call(prompt, model=model, system=system)
+        elapsed = round(time.time() - start, 3)
+        log_call(
+            provider=provider_name,
+            model=model or provider.DEFAULT_MODEL,
+            prompt=prompt,
+            elapsed=elapsed,
+            agent=agent,
+            reply=reply,
+            usage=usage,
+            success=True,
+        )
+        return reply
+    except Exception as exc:
+        elapsed = round(time.time() - start, 3)
+        log_call(
+            provider=provider_name,
+            model=model or provider.DEFAULT_MODEL,
+            prompt=prompt,
+            elapsed=elapsed,
+            agent=agent,
+            success=False,
+            error=str(exc),
+        )
+        raise
