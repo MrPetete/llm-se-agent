@@ -1,8 +1,10 @@
 # llm/logging_.py
 import json
-import time
 import logging
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+_CST = timezone(timedelta(hours=8))
 
 LOG_PATH = Path("logs/llm_calls.jsonl")
 LOG_PATH.parent.mkdir(exist_ok=True)
@@ -23,7 +25,7 @@ def log_call(
     error: str | None = None,
 ):
     entry = {
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "timestamp": datetime.now(_CST).strftime("%Y-%m-%dT%H:%M:%S+08:00"),
         "provider": provider,
         "model": model,
         "agent": agent,
