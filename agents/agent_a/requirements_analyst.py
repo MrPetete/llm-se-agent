@@ -19,9 +19,29 @@ import re
 def _parse_crew_output(result) -> any:
     """Convert CrewOutput to parsed JSON, stripping markdown fences if present."""
     text = str(result).strip()
+
+    # Try to extract JSON from a ```json ... ``` block anywhere in the text
+    fence_match = re.search(r"```json\s*([\s\S]*?)```", text)
+    if fence_match:
+        return json.loads(fence_match.group(1).strip())
+
+    # Try a bare ``` ... ``` block
+    fence_match = re.search(r"```\s*([\s\S]*?)```", text)
+    if fence_match:
+        candidate = fence_match.group(1).strip()
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    # Try the whole text after stripping leading/trailing fences
     text = re.sub(r"^```json\s*", "", text)
     text = re.sub(r"^```\s*", "", text)
     text = re.sub(r"\s*```$", "", text).strip()
+
+    if not text:
+        raise ValueError("Agent returned an empty response")
+
     return json.loads(text)
 
 

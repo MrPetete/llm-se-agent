@@ -179,8 +179,13 @@ class AdvancedTestHarness:
             mem_after = memory_usage(-1, interval=0.1, timeout=1)[0]
             peak_memory = round(max(0.0, mem_after - mem_before), 2)
 
-            # 2. 提取生成的 Python 代码并统计行数
-            python_code = self.extract_code_from_json(raw_response)
+            # 2. 从 implementation_output.json 读取生成的代码（run_pipeline 返回摘要，不含代码本体）
+            impl_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', 'implementation_output.json')
+            if os.path.exists(impl_path):
+                with open(impl_path, 'r', encoding='utf-8') as _f:
+                    python_code = json.load(_f).get('code', '')
+            else:
+                python_code = self.extract_code_from_json(raw_response)
             lines_count = len(python_code.splitlines()) if python_code else 0
 
             # 3. 运行 Pylint 代码审查
