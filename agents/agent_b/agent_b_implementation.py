@@ -2,6 +2,7 @@ import json
 import os
 import ast
 import re
+import time
 
 from dotenv import load_dotenv
 import dashscope
@@ -48,6 +49,19 @@ def validate_analysis_output(agent_a_data):
     return True, "Agent A output is valid"
 
 
+def _flatten_to_str(value):
+    """Convert a list (possibly of dicts) or any value to a single joined string."""
+    if not isinstance(value, list):
+        return str(value)
+    parts = []
+    for item in value:
+        if isinstance(item, dict):
+            parts.append(" ".join(str(v) for v in item.values()))
+        else:
+            parts.append(str(item))
+    return " ".join(parts)
+
+
 def detect_project_topic(agent_a_data):
     """
     Detect the project topic from the updated Agent A PRD output.
@@ -61,11 +75,9 @@ def detect_project_topic(agent_a_data):
 
     text_parts = [
         prd.get("product_overview", ""),
-        architecture.get("data_flow", ""),
-        " ".join(core_features) if isinstance(core_features, list) else str(core_features),
-        " ".join(functional_requirements)
-        if isinstance(functional_requirements, list)
-        else str(functional_requirements)
+        _flatten_to_str(architecture.get("data_flow", "")),
+        _flatten_to_str(core_features),
+        _flatten_to_str(functional_requirements),
     ]
 
     text = " ".join(text_parts).lower()
@@ -370,9 +382,9 @@ def build_qwen_prompt(agent_a_data):
     architecture = agent_a_data.get("architecture_outline", {})
 
     product_overview = prd.get("product_overview", "")
-    core_features = prd.get("core_features", [])
-    functional_requirements = prd.get("functional_requirements", [])
-    data_flow = architecture.get("data_flow", "")
+    core_features = _flatten_to_str(prd.get("core_features", []))
+    functional_requirements = _flatten_to_str(prd.get("functional_requirements", []))
+    data_flow = _flatten_to_str(architecture.get("data_flow", ""))
 
     agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
 
@@ -540,9 +552,10 @@ def get_qwen_content(response):
     raise ValueError(f"Cannot extract Qwen content from response: {output}")
 
 
-def qwen_generate_implementation(agent_a_data):
+def qwen_generate_implementation(agent_a_data, max_retries=3, retry_delay=5):
     """
     Generate Agent B implementation output using Qwen / DashScope API.
+    Retries up to max_retries times on connection errors.
     """
     load_dotenv()
 
@@ -556,22 +569,38 @@ def qwen_generate_implementation(agent_a_data):
 
     prompt = build_qwen_prompt(agent_a_data)
 
-    response = dashscope.Generation.call(
-        model="qwen-turbo",
-        prompt=prompt
-    )
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = dashscope.Generation.call(
+                model="qwen-turbo",
+                prompt=prompt
+            )
 
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Qwen API call failed: {response.code} - {response.message}"
-        )
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Qwen API call failed: {response.code} - {response.message}"
+                )
 
-    content = get_qwen_content(response)
+            content = get_qwen_content(response)
+            json_text = extract_json_from_text(content)
+            return json.loads(json_text)
 
-    json_text = extract_json_from_text(content)
-    implementation_output = json.loads(json_text)
+        except (RuntimeError, ValueError):
+            raise
+        except Exception as error:
+            last_error = error
+            if attempt < max_retries:
+                print(
+                    "    ⚠️ Qwen connection error "
+                    f"(attempt {attempt}/{max_retries}), "
+                    f"retrying in {retry_delay}s: {error}"
+                )
+                time.sleep(retry_delay)
+            else:
+                print(f"    ❌ Qwen connection failed after {max_retries} attempts: {error}")
 
-    return implementation_output
+    raise RuntimeError(f"Qwen generation failed after {max_retries} retries: {last_error}")
 
 
 def build_repair_prompt(agent_a_data, implementation_output, error_message):
@@ -733,6 +762,19 @@ def run_agent_b(input_path, output_dir):
         except Exception as error:
             retry_used = True
             retry_reason = f"syntax_repair_failed: {error}"
+
+    if not syntax_passed:
+        print(
+            "    ⚠️ Qwen code has syntax errors after repair attempt, "
+            "falling back to mock generator."
+        )
+        implementation_output = mock_llm_generate_implementation(agent_a_data)
+        generation_mode = "mock_llm_fallback"
+        retry_used = True
+        retry_reason = "syntax_repair_failed_fallback_to_mock"
+        syntax_passed, syntax_message = check_python_syntax_from_code(
+            implementation_output["code"]
+        )
 
     implementation_json_path, code_file_path = save_implementation_output(
         output_dir,

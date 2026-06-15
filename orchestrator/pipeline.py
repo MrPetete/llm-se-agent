@@ -29,9 +29,8 @@ def run_pipeline(prompt: str, output_dir: str = "./outputs", run_test: bool = Tr
     Args:
         prompt: Plain-English description of the software to build.
         output_dir: Base directory for output; a timestamped subfolder is created.
-        run_test: Whether the testing agent (Agent C) should run. Currently
-            advisory only — passed through to the run summary until M4/M1 wire
-            a way to skip the test stage in the crew.
+        run_test: Whether the testing agent (Agent C) should run. Passed through
+            to main.run_pipeline, which skips stages 3 & 4 when False.
 
     Returns:
         dict with keys: "result" (final output text) and "run_dir" (path written).
@@ -39,11 +38,13 @@ def run_pipeline(prompt: str, output_dir: str = "./outputs", run_test: bool = Tr
     # Lazy import: constructing the crew is a side effect we only want at call time.
     from orchestrator.main import run_pipeline
 
-    result = run_pipeline(prompt)
-
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     run_dir = Path(output_dir) / stamp
     run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Stage artifacts (analysis/implementation/test JSON) are written into run_dir
+    # by main.run_pipeline; the flags below now actually take effect there.
+    result = run_pipeline(prompt, output_dir=str(run_dir), run_test=run_test)
 
     output_text = str(result)
     (run_dir / "result.txt").write_text(output_text, encoding="utf-8")

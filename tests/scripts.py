@@ -50,9 +50,20 @@ class AdvancedTestHarness:
             print(f"[{case['id']}] Testing: {case['name']}...")
             
             start_time = time.time()
-            # 1. Get output from the pipeline
-            output_response = run_pipeline(case['prompt'])
+            # 1. Get output from the pipeline, measuring its peak memory.
+            #    memory_usage runs the callable and samples RSS every `interval`
+            #    seconds; we report the delta between peak and baseline so the
+            #    number reflects what the pipeline actually consumed (the old
+            #    code profiled time.sleep(), which measured nothing and produced
+            #    the bogus 0.0 values in earlier reports).
+            mem_samples, output_response = memory_usage(
+                (run_pipeline, (case['prompt'],), {}),
+                interval=0.1,
+                retval=True,
+                max_usage=False,
+            )
             duration = round(time.time() - start_time, 2)
+            peak_mem = round(max(mem_samples) - min(mem_samples), 2)
             
             # 2. ЭНЭ ХЭСГИЙГ ХУУЛЖ ТАВИНА (JSON-оос кодыг салгах)
             try:
@@ -69,13 +80,6 @@ class AdvancedTestHarness:
             # Measure metrics
             loc = self.count_loc(output_code)
             pylint_score = self.get_pylint_score(file_name)
-            
-            # Measure Peak Memory
-            try:
-                mem_usage_list = memory_usage((time.sleep, (0.5,)), interval=0.1)
-                peak_mem = round(max(mem_usage_list) - min(mem_usage_list), 2)
-            except Exception:
-                peak_mem = 0
 
             result = {
                 "id": case['id'],
@@ -95,8 +99,8 @@ class AdvancedTestHarness:
         self.save_report()
 
     def save_report(self):
-        with open("qa_metrics_report.json", "w") as f:
-            json.dump(self.results, f, indent=4)
+        with open("qa_metrics_report.json", "w", encoding="utf-8") as f:
+            json.dump(self.results, f, indent=4, ensure_ascii=False)
         print("💾 Full 8-scenario report saved to 'qa_metrics_report.json'.")
 
 if __name__ == "__main__":
