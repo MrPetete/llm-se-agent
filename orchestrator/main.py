@@ -12,50 +12,70 @@ from agents.agent_c.agent_c_debugger import run_agent_c_debugger
 load_dotenv()
 
 
-def run_pipeline(user_input: str) -> str:
+def run_pipeline(user_input: str, output_dir: str = "outputs", run_test: bool = True) -> str:
     """Run the full A -> B -> C pipeline for a given user requirement.
 
-    Stage 1: M2's real RequirementsAnalyst  -> outputs/analysis_output.json
-    Stage 2: M3's real Agent B              -> outputs/implementation_output.json
-    Stage 3: M4's real Agent C tester       -> outputs/test_output.json
-    Stage 4: M4's real Agent C debugger     -> outputs/debug_output.json
+    Args:
+        user_input: Plain-English description of the software to build.
+        output_dir: Directory for all stage JSON artifacts.
+        run_test: When False, stages 3 & 4 (Agent C tester + debugger) are skipped.
+
+    Stage 1: M2's real RequirementsAnalyst  -> {output_dir}/analysis_output.json
+    Stage 2: M3's real Agent B              -> {output_dir}/implementation_output.json
+    Stage 3: M4's real Agent C tester       -> {output_dir}/test_output.json
+    Stage 4: M4's real Agent C debugger     -> {output_dir}/debug_output.json
     """
-    os.makedirs("outputs", exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    analysis_path = os.path.join(output_dir, "analysis_output.json")
+    implementation_path = os.path.join(output_dir, "implementation_output.json")
+    test_path = os.path.join(output_dir, "test_output.json")
 
     # ── Stage 1: M2's real Agent A ──
     print("\n===== STAGE 1: AGENT A (Requirements Analysis) =====")
     analyst = RequirementsAnalyst()
     analysis = analyst.analyze(user_input)
 
-    with open("outputs/analysis_output.json", "w", encoding="utf-8") as f:
+    with open(analysis_path, "w", encoding="utf-8") as f:
         json.dump(analysis, f, indent=4, ensure_ascii=False)
-    print("Agent A output saved -> outputs/analysis_output.json")
+    print(f"Agent A output saved -> {analysis_path}")
 
     # ── Stage 2: M3's real Agent B ──
     print("\n===== STAGE 2: AGENT B (Code Generation) =====")
-    b_result = run_agent_b("outputs/analysis_output.json", "outputs")
+    b_result = run_agent_b(analysis_path, output_dir)
     if not b_result.get("success"):
         print(f"Agent B failed: {b_result.get('message')}")
     else:
         print(f"Agent B output saved -> {b_result.get('implementation_json')}")
         print(f"Mode: {b_result.get('mode')} | Syntax: {b_result.get('syntax_check')}")
 
+    if not run_test:
+        print("\n===== STAGES 3 & 4 SKIPPED (--no-test) =====")
+        return json.dumps({
+            "agent_b": {
+                "mode": b_result.get("mode"),
+                "filename": b_result.get("filename"),
+                "syntax_check": b_result.get("syntax_check"),
+            },
+            "agent_c_tester": None,
+            "agent_c_debugger": None,
+        }, indent=2, ensure_ascii=False)
+
     # ── Stage 3: M4's real Agent C tester ──
     print("\n===== STAGE 3: AGENT C (Test Generation) =====")
     c_result = run_agent_c(
-        "outputs/implementation_output.json",
-        "outputs",
-        analysis_path="outputs/analysis_output.json",
+        implementation_path,
+        output_dir,
+        analysis_path=analysis_path,
     )
     if not c_result.get("success"):
         print(f"Agent C tester: some tests failed (mode: {c_result.get('mode')})")
     else:
-        print(f"Agent C tester finished -> outputs/test_output.json")
+        print(f"Agent C tester finished -> {test_path}")
     print(f"Mode: {c_result.get('mode')} | Tests: {c_result.get('tests_passed')} passed, {c_result.get('tests_failed')} failed")
 
     # ── Stage 4: M4's real Agent C debugger ──
     print("\n===== STAGE 4: AGENT C (Debugger) =====")
-    d_result = run_agent_c_debugger("outputs/test_output.json", "outputs")
+    d_result = run_agent_c_debugger(test_path, output_dir)
     status = d_result.get("status")
     verified = d_result.get("verified", False)
     print(f"Debugger status: {status} | Verified: {verified}")
