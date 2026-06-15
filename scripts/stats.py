@@ -8,10 +8,13 @@ Fields are read defensively with .get() because early log lines (Week 1)
 predate the `agent`, `provider`, `success`, and cost fields added later.
 """
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 
-from config import settings
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from config import settings  # noqa: E402
 
 LOG_PATH = Path("logs/llm_calls.jsonl")
 

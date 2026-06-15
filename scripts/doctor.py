@@ -52,6 +52,7 @@ def _docker_ok(args, timeout=5):
 
 
 try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from config import settings
     sandbox_image = settings.sandbox_image
     require_docker = settings.sandbox_require_docker
