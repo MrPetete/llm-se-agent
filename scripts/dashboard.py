@@ -76,7 +76,7 @@ if selected_model != "All":
 
 total_calls = len(filtered)
 total_tokens = int(filtered["total_tokens"].sum())
-failed_calls = int((~filtered["success"]).sum())
+failed_calls = int((~filtered["success"].astype(bool)).sum())
 avg_latency = filtered["elapsed_seconds"].mean()
 
 c1, c2, c3, c4 = st.columns(4)

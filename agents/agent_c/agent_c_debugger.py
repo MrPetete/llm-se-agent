@@ -32,6 +32,8 @@ import json
 import os
 import re
 import sys
+import time
+from types import SimpleNamespace
 
 # Reuse Week 2 building blocks. Import works whether this module is run as a
 # package (agents.agent_c.agent_c_debugger, e.g. from the orchestrator or
@@ -61,6 +63,11 @@ try:
     import dashscope
 except Exception:  # pragma: no cover - optional dependency
     pass
+
+try:
+    from llm.logging_ import log_call as _log_call
+except ImportError:
+    _log_call = None
 
 
 # --------------------------------------------------------------------------- #
@@ -163,6 +170,7 @@ Rules:
 
 
 def qwen_repair_code(code, test_code, analyzed_failures):
+    import time
     if not _DASHSCOPE_AVAILABLE:
         raise RuntimeError("dashscope not installed")
     load_dotenv()
@@ -172,9 +180,29 @@ def qwen_repair_code(code, test_code, analyzed_failures):
     dashscope.api_key = api_key
     dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
     prompt = build_repair_prompt(code, test_code, analyzed_failures)
+    t0 = time.time()
     response = dashscope.Generation.call(model="qwen-max", prompt=prompt)
+    elapsed = round(time.time() - t0, 3)
     if response.status_code != 200:
+        if _log_call:
+            try:
+                _log_call(provider="qwen", model="qwen-max", prompt=prompt,
+                          elapsed=elapsed, agent="agent_c_debugger", success=False,
+                          error=f"{response.code} - {response.message}")
+            except Exception:
+                pass
         raise RuntimeError(f"Qwen call failed: {response.code} - {response.message}")
+    if _log_call:
+        try:
+            usage = getattr(response, "usage", None)
+            class _U:
+                prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+                completion_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+                total_tokens = prompt_tokens + completion_tokens
+            _log_call(provider="qwen", model="qwen-max", prompt=prompt,
+                      elapsed=elapsed, agent="agent_c_debugger", success=True, usage=_U())
+        except Exception:
+            pass
     content = response.output.get("text") or (
         response.output["choices"][0]["message"]["content"]
     )

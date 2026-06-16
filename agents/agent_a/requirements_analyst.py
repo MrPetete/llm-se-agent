@@ -14,6 +14,37 @@ from typing import Dict, Any
 import json
 import os
 import re
+import time
+
+try:
+    from llm.logging_ import log_call as _log_call
+except ImportError:
+    _log_call = None
+
+
+def _log_crew(crew, task_label: str, elapsed: float) -> None:
+    if not _log_call:
+        return
+    try:
+        m = crew.usage_metrics
+        if isinstance(m, dict):
+            pt = m.get("prompt_tokens", 0)
+            ct = m.get("completion_tokens", 0)
+            tt = m.get("total_tokens", 0)
+        else:
+            pt = getattr(m, "prompt_tokens", 0) or 0
+            ct = getattr(m, "completion_tokens", 0) or 0
+            tt = getattr(m, "total_tokens", 0) or 0
+
+        class _U:
+            prompt_tokens = int(pt)
+            completion_tokens = int(ct)
+            total_tokens = int(tt)
+
+        _log_call(provider="qwen", model="qwen-max", prompt=f"[crewai:{task_label}]",
+                  elapsed=elapsed, agent="agent_a", success=True, usage=_U())
+    except Exception:
+        pass
 
 
 def _parse_crew_output(result) -> any:
@@ -242,30 +273,40 @@ class RequirementsAnalyst:
             tasks=[prd_task],
             verbose=True,
         )
+        t0 = time.time()
         prd_result = crew.kickoff()
+        _log_crew(crew, "prd", round(time.time() - t0, 3))
         prd_json = _parse_crew_output(prd_result)
 
         # Validate PRD
         validated_prd_task = self.create_validated_prd_task(prd_json)
         crew1b = Crew(agents=[self.agent], tasks=[validated_prd_task], verbose=True)
+        t0 = time.time()
         validated_prd_result = crew1b.kickoff()
+        _log_crew(crew1b, "prd_validate", round(time.time() - t0, 3))
         validated_prd_json = _parse_crew_output(validated_prd_result)
 
         # Create and run user stories task
         stories_task = self.create_user_stories_task(validated_prd_json)
         crew2 = Crew(agents=[self.agent], tasks=[stories_task], verbose=True)
+        t0 = time.time()
         stories_result = crew2.kickoff()
+        _log_crew(crew2, "user_stories", round(time.time() - t0, 3))
 
         # Create and run architecture outline task
         arch_task = self.create_architecture_outline_task(validated_prd_json)
         crew3 = Crew(agents=[self.agent], tasks=[arch_task], verbose=True)
+        t0 = time.time()
         arch_result = crew3.kickoff()
+        _log_crew(crew3, "architecture", round(time.time() - t0, 3))
         arch_json = _parse_crew_output(arch_result)
 
         # Create and run UML diagram task
         uml_task = self.create_uml_diagram_task(validated_prd_json, arch_json)
         crew4 = Crew(agents=[self.agent], tasks=[uml_task], verbose=True)
+        t0 = time.time()
         uml_result = crew4.kickoff()
+        _log_crew(crew4, "uml_diagram", round(time.time() - t0, 3))
         uml_text = str(uml_result).strip()
 
         return {
