@@ -2,6 +2,7 @@ import json
 import os
 import ast
 import re
+import time
 
 from dotenv import load_dotenv
 import dashscope
@@ -385,8 +386,6 @@ def build_qwen_prompt(agent_a_data):
     functional_requirements = _flatten_to_str(prd.get("functional_requirements", []))
     data_flow = _flatten_to_str(architecture.get("data_flow", ""))
 
-    agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
-
     return f"""
 You are Agent B: Code Generator in an LLM-based Software Engineering Agent
 system.
@@ -545,7 +544,8 @@ def qwen_generate_implementation(agent_a_data, max_retries=3, retry_delay=5):
         except Exception as error:
             last_error = error
             if attempt < max_retries:
-                print(f"    ⚠️ Qwen connection error (attempt {attempt}/{max_retries}), retrying in {retry_delay}s: {error}")
+                print(f"    Qwen connection error (attempt {attempt}/{max_retries}), "
+                      f"retrying in {retry_delay}s: {error}")
                 time.sleep(retry_delay)
             else:
                 print(f"    ❌ Qwen connection failed after {max_retries} attempts: {error}")
@@ -708,7 +708,7 @@ def run_agent_b(input_path, output_dir):
             retry_reason = f"syntax_repair_failed: {error}"
 
     if not syntax_passed:
-        print(f"    ⚠️ Qwen code has syntax errors after repair attempt, falling back to mock generator.")
+        print("    Qwen code has syntax errors after repair attempt, falling back to mock generator.")
         implementation_output = mock_llm_generate_implementation(agent_a_data)
         generation_mode = "mock_llm_fallback"
         retry_used = True
