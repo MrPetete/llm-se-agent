@@ -8,6 +8,7 @@ from agents.agent_a.requirements_analyst import RequirementsAnalyst
 from agents.agent_b.agent_b_implementation import run_agent_b
 from agents.agent_c.agent_c_tester import run_agent_c
 from agents.agent_c.agent_c_debugger import run_agent_c_debugger
+from llm.observability import setup, set_agent
 
 load_dotenv()
 
@@ -30,8 +31,11 @@ def run_pipeline(user_input: str, output_dir: str = "outputs", run_test: bool = 
     implementation_path = os.path.join(output_dir, "implementation_output.json")
     test_path = os.path.join(output_dir, "test_output.json")
 
+    setup()
+
     # ── Stage 1: M2's real Agent A ──
     print("\n===== STAGE 1: AGENT A (Requirements Analysis) =====")
+    set_agent("agent_a")
     analyst = RequirementsAnalyst()
     analysis = analyst.analyze(user_input)
 
@@ -41,6 +45,7 @@ def run_pipeline(user_input: str, output_dir: str = "outputs", run_test: bool = 
 
     # ── Stage 2: M3's real Agent B ──
     print("\n===== STAGE 2: AGENT B (Code Generation) =====")
+    set_agent("agent_b")
     b_result = run_agent_b(analysis_path, output_dir)
     if not b_result.get("success"):
         print(f"Agent B failed: {b_result.get('message')}")
@@ -62,6 +67,7 @@ def run_pipeline(user_input: str, output_dir: str = "outputs", run_test: bool = 
 
     # ── Stage 3: M4's real Agent C tester ──
     print("\n===== STAGE 3: AGENT C (Test Generation) =====")
+    set_agent("agent_c")
     c_result = run_agent_c(
         implementation_path,
         output_dir,
@@ -75,6 +81,7 @@ def run_pipeline(user_input: str, output_dir: str = "outputs", run_test: bool = 
 
     # ── Stage 4: M4's real Agent C debugger ──
     print("\n===== STAGE 4: AGENT C (Debugger) =====")
+    set_agent("agent_c_debugger")
     d_result = run_agent_c_debugger(test_path, output_dir)
     status = d_result.get("status")
     verified = d_result.get("verified", False)
