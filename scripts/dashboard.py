@@ -43,7 +43,7 @@ def load_data(path: Path) -> pd.DataFrame:
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df["agent"] = df.get("agent", pd.Series(dtype=str)).fillna("untagged")
     df["provider"] = df.get("provider", pd.Series(dtype=str)).fillna("unknown")
-    df["success"] = df.get("success", pd.Series(dtype=object)).fillna(True)
+    df["success"] = df.get("success", pd.Series(dtype=object)).fillna(True).astype(bool)
     df["total_tokens"] = df["total_tokens"].fillna(0).astype(int)
     df["prompt_tokens"] = df["prompt_tokens"].fillna(0).astype(int)
     df["completion_tokens"] = df["completion_tokens"].fillna(0).astype(int)
