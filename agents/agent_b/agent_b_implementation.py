@@ -3,7 +3,6 @@ import os
 import ast
 import re
 import time
-from types import SimpleNamespace
 
 from dotenv import load_dotenv
 import dashscope
@@ -444,8 +443,13 @@ The JSON output must follow this schema:
     "filename": "suggested_file_name.py",
     "language": "python",
     "dependencies": [],
-    "notes": "human-readable testing notes including main class name, public methods, and suggested test cases"
+    "notes": (
+    "human-readable testing notes including main class name, "
+    "public methods, validation rules, expected return format, "
+    "direct-test guidance, and suggested test cases"
+)
 }}
+
 
 Rules:
 1. Generate clean and runnable Python code.
@@ -480,6 +484,46 @@ Rules:
     delete_user, and list_users methods for Agent C tests.
 18. The notes field is for human-readable testing guidance.
 19. Public method structure is more important for Agent C.
+20. The generated code string must start with a module-level docstring.
+21. Add docstrings for every class and every public method.
+22. Ensure the generated code string ends with a final newline character.
+23. Keep every generated code line at or below 100 characters.
+24. Do not import unused modules.
+25. When using open(), always specify encoding="utf-8".
+26. When using requests.get(), always specify a timeout.
+27. Do not use broad except Exception. Catch specific exceptions when possible.
+28. Do not call input() inside public business-logic methods.
+29. Put all input() and print() interaction only under if __name__ == "__main__".
+30. Public methods must be directly testable by Agent C without user interaction.
+31. Strictly follow the original requirement. Do not add web APIs,
+    login systems, databases, or extra features unless the requirement
+    explicitly asks for them.
+32. Do not import modules unless they are actually used in the generated code.
+33. For SQLite/database code, catch sqlite3.Error instead of broad Exception.
+34. For file I/O code, catch OSError or ValueError instead of broad Exception.
+35. Avoid reusing the same variable names in the CLI block and public methods.
+36. In the CLI block, use cli_ prefixed variables such as cli_title,
+    cli_description, cli_task_id, and cli_result.
+37. Avoid unnecessary elif after break or return. Use if/continue/break
+    structure when cleaner.
+38. Format long SQL strings, messages, and f-strings across multiple lines
+    so every generated line stays at or below 100 characters.
+39. Before finalizing the generated code, mentally check common pylint issues:
+    missing docstrings, unused imports, line-too-long, broad exceptions,
+    redefined-outer-name, and no-else-return/no-else-break.
+40. Before returning the JSON, review the generated Python code as if
+    running pylint on it.
+41. Remove all unused imports.
+42. Avoid variable names in the main CLI block that shadow method
+    parameters or local variables. Use cli_ prefixed names.
+43. For SQLite code, catch sqlite3.Error instead of broad Exception.
+44. Do not use elif after a branch that already uses break or return.
+45. Split long docstrings, SQL statements, f-strings, and messages so
+    no generated code line exceeds 100 characters.
+46. If a public method needs confirmation, pass confirmation as a
+    parameter instead of calling input() inside the method.
+Full Agent A input:
+{agent_a_json}
 """
 
 
@@ -574,8 +618,11 @@ def qwen_generate_implementation(agent_a_data, max_retries=3, retry_delay=5):
         except Exception as error:
             last_error = error
             if attempt < max_retries:
-                print(f"    Qwen connection error (attempt {attempt}/{max_retries}), "
-                      f"retrying in {retry_delay}s: {error}")
+                print(
+                    "    ⚠️ Qwen connection error "
+                    f"(attempt {attempt}/{max_retries}), "
+                    f"retrying in {retry_delay}s: {error}"
+                )
                 time.sleep(retry_delay)
             else:
                 print(f"    ❌ Qwen connection failed after {max_retries} attempts: {error}")
@@ -620,7 +667,10 @@ The JSON output must follow this schema:
     "filename": "suggested_file_name.py",
     "language": "python",
     "dependencies": [],
-    "notes": "short notes for Agent C"
+    "notes": (
+    "Short notes for Agent C, including public methods, validation rules, "
+    "expected return format, and any important testing guidance."
+)
 }}
 
 Rules:
@@ -628,6 +678,9 @@ Rules:
 2. Fix the Python syntax problem.
 3. The code must pass ast.parse.
 4. Use simple runnable Python code.
+5. Preserve module/class/function docstrings when repairing code.
+6. Keep the repaired code aligned with the original requirement.
+7. Do not add extra frameworks or features during repair.
 """
 
 
@@ -748,7 +801,10 @@ def run_agent_b(input_path, output_dir):
             retry_reason = f"syntax_repair_failed: {error}"
 
     if not syntax_passed:
-        print("    Qwen code has syntax errors after repair attempt, falling back to mock generator.")
+        print(
+            "    ⚠️ Qwen code has syntax errors after repair attempt, "
+            "falling back to mock generator."
+        )
         implementation_output = mock_llm_generate_implementation(agent_a_data)
         generation_mode = "mock_llm_fallback"
         retry_used = True
