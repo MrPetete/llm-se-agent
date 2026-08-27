@@ -7,6 +7,24 @@ import time
 from dotenv import load_dotenv
 import dashscope
 
+try:
+    from llm.logging_ import log_call as _log_call
+except ImportError:
+    _log_call = None
+
+
+def _dashscope_usage(response):
+    u = getattr(response, 'usage', None)
+    if u is None:
+        return None
+    if isinstance(u, dict):
+        inp = u.get('input_tokens', 0) or 0
+        out = u.get('output_tokens', 0) or 0
+    else:
+        inp = getattr(u, 'input_tokens', 0) or 0
+        out = getattr(u, 'output_tokens', 0) or 0
+    return SimpleNamespace(prompt_tokens=inp, completion_tokens=out, total_tokens=inp + out)
+
 
 def read_json_file(file_path):
     """
@@ -386,8 +404,6 @@ def build_qwen_prompt(agent_a_data):
     functional_requirements = _flatten_to_str(prd.get("functional_requirements", []))
     data_flow = _flatten_to_str(architecture.get("data_flow", ""))
 
-    agent_a_json = json.dumps(agent_a_data, indent=4, ensure_ascii=False)
-
     return f"""
 You are Agent B: Code Generator in an LLM-based Software Engineering Agent
 system.
@@ -572,15 +588,26 @@ def qwen_generate_implementation(agent_a_data, max_retries=3, retry_delay=5):
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
+            t0 = time.time()
             response = dashscope.Generation.call(
                 model="qwen-turbo",
                 prompt=prompt
             )
+            elapsed = round(time.time() - t0, 3)
 
             if response.status_code != 200:
+                if _log_call:
+                    _log_call(provider="qwen", model="qwen-turbo", prompt=prompt,
+                              elapsed=elapsed, agent="agent_b", success=False,
+                              error=f"{response.code} - {response.message}")
                 raise RuntimeError(
                     f"Qwen API call failed: {response.code} - {response.message}"
                 )
+
+            if _log_call:
+                _log_call(provider="qwen", model="qwen-turbo", prompt=prompt,
+                          elapsed=elapsed, agent="agent_b", success=True,
+                          usage=_dashscope_usage(response))
 
             content = get_qwen_content(response)
             json_text = extract_json_from_text(content)
@@ -677,18 +704,28 @@ def qwen_repair_implementation(agent_a_data, implementation_output, error_messag
         error_message
     )
 
+    t0 = time.time()
     response = dashscope.Generation.call(
         model="qwen-turbo",
         prompt=prompt
     )
+    elapsed = round(time.time() - t0, 3)
 
     if response.status_code != 200:
+        if _log_call:
+            _log_call(provider="qwen", model="qwen-turbo", prompt=prompt,
+                      elapsed=elapsed, agent="agent_b", success=False,
+                      error=f"{response.code} - {response.message}")
         raise RuntimeError(
             f"Qwen repair failed: {response.code} - {response.message}"
         )
 
-    content = get_qwen_content(response)
+    if _log_call:
+        _log_call(provider="qwen", model="qwen-turbo", prompt=prompt,
+                  elapsed=elapsed, agent="agent_b", success=True,
+                  usage=_dashscope_usage(response))
 
+    content = get_qwen_content(response)
     json_text = extract_json_from_text(content)
     repaired_output = json.loads(json_text)
 

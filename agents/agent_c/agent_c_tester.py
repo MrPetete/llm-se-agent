@@ -31,6 +31,7 @@ import json
 import os
 import re
 import sys
+import time
 
 try:
     from dotenv import load_dotenv
@@ -38,6 +39,11 @@ try:
     _DASHSCOPE_AVAILABLE = True
 except Exception:  # pragma: no cover - optional dependency
     _DASHSCOPE_AVAILABLE = False
+
+try:
+    from llm.logging_ import log_call as _log_call
+except ImportError:
+    _log_call = None
 
 
 # --------------------------------------------------------------------------- #
@@ -325,9 +331,26 @@ def qwen_generate_tests(impl, analysis=None):
     dashscope.api_key = api_key
     dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
     prompt = build_test_prompt(impl, analysis)
+    t0 = time.time()
     response = dashscope.Generation.call(model="qwen-max", prompt=prompt)
+    elapsed = round(time.time() - t0, 3)
     if response.status_code != 200:
+        if _log_call:
+            _log_call(provider="qwen", model="qwen-max", prompt=prompt,
+                      elapsed=elapsed, agent="agent_c_tester", success=False,
+                      error=f"{response.code} - {response.message}")
         raise RuntimeError(f"Qwen call failed: {response.code} - {response.message}")
+    if _log_call:
+        u = response.usage if hasattr(response, "usage") else {}
+        from types import SimpleNamespace
+        usage = SimpleNamespace(
+            prompt_tokens=int((u.get("input_tokens", 0) if isinstance(u, dict) else getattr(u, "input_tokens", 0)) or 0),
+            completion_tokens=int((u.get("output_tokens", 0) if isinstance(u, dict) else getattr(u, "output_tokens", 0)) or 0),
+            total_tokens=0,
+        )
+        usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
+        _log_call(provider="qwen", model="qwen-max", prompt=prompt,
+                  elapsed=elapsed, agent="agent_c_tester", success=True, usage=usage)
     content = response.output.get("text") or (
         response.output["choices"][0]["message"]["content"]
     )

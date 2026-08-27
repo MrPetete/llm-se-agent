@@ -43,7 +43,7 @@ def load_data(path: Path) -> pd.DataFrame:
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df["agent"] = df.get("agent", pd.Series(dtype=str)).fillna("untagged")
     df["provider"] = df.get("provider", pd.Series(dtype=str)).fillna("unknown")
-    df["success"] = df.get("success", pd.Series(dtype=object)).fillna(True)
+    df["success"] = df.get("success", pd.Series(dtype=object)).fillna(True).astype(bool)
     df["total_tokens"] = df["total_tokens"].fillna(0).astype(int)
     df["prompt_tokens"] = df["prompt_tokens"].fillna(0).astype(int)
     df["completion_tokens"] = df["completion_tokens"].fillna(0).astype(int)
@@ -76,7 +76,7 @@ if selected_model != "All":
 
 total_calls = len(filtered)
 total_tokens = int(filtered["total_tokens"].sum())
-failed_calls = int((~filtered["success"]).sum())
+failed_calls = int((~filtered["success"].astype(bool)).sum())
 avg_latency = filtered["elapsed_seconds"].mean()
 
 c1, c2, c3, c4 = st.columns(4)
